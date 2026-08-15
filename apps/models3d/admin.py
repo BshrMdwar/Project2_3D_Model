@@ -31,7 +31,7 @@ class Model3DAdmin(admin.ModelAdmin):
         'id', 'ai_label', 'category', 'is_active',
         'downloads_count', 'usage_count', 'views_count', 'uploaded_at',
     )
-    list_filter  = ('is_active', 'ai_label', 'category', 'is_manifold')
+    list_filter  = ('is_active', 'ai_label', 'category')
     search_fields = ('id', 'ai_label')
     list_editable = ('is_active',)
     filter_horizontal = ('tags',)

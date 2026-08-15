@@ -161,8 +161,6 @@ class Model3DStatsView(APIView):
             total_models=Count('id'),
             avg_vertices=Avg('vertices'),
             avg_faces=Avg('faces'),
-            avg_stability=Avg('stability_score'),
-            manifold_count=Count('id', filter=Q(is_manifold=True)),
             total_downloads=Sum('downloads_count'),
             total_views=Sum('views_count'),
         )
@@ -524,5 +522,18 @@ class Model3DUploadView(View):
         with open(geometry_path) as f:
             data = json.load(f)
 
-        model.vertices = data.get("_debug_raw", {}).get("edges")
+        model.vertices = data.get("vertices")
+        model.faces = data.get("faces")
         model.edges = data.get("_debug_raw", {}).get("edges")
+
+        dims = data.get("dimensions") or {}
+        if dims:
+            model.bounding_box = [
+                dims.get("width"),
+                dims.get("depth"),
+                dims.get("height"),
+                dims.get("aspect_hw"),
+                dims.get("aspect_hd"),
+                dims.get("aspect_wd"),
+            ]
+            

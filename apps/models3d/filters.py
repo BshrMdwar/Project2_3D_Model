@@ -18,13 +18,6 @@ class Model3DFilter(django_filters.FilterSet):
     height_min = django_filters.NumberFilter(method='filter_height_min')
     height_max = django_filters.NumberFilter(method='filter_height_max')
 
-    # ── Quality ──────────────────────────────────────
-    is_manifold     = django_filters.BooleanFilter(field_name='is_manifold')
-    stability_min   = django_filters.NumberFilter(field_name='stability_score', lookup_expr='gte')
-    elongation_max  = django_filters.NumberFilter(field_name='elongation',      lookup_expr='lte')
-
-    # ── Shape ────────────────────────────────────────
-    symmetry_axis   = django_filters.CharFilter(field_name='symmetry_axis', lookup_expr='iexact')
 
     # ── Date ─────────────────────────────────────────
     uploaded_after  = django_filters.DateTimeFilter(field_name='uploaded_at', lookup_expr='gte')

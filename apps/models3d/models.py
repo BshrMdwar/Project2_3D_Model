@@ -78,25 +78,6 @@ class Model3D(models.Model):
     # ── Bounding Box ─────────────────────────────────────
     bounding_box = ArrayField(models.FloatField(), size=6, null=True, blank=True)
 
-    # ── Measurements ─────────────────────────────────────
-    surface_area    = models.FloatField(null=True)
-    volume_estimate = models.FloatField(null=True)
-
-    # ── Topology ─────────────────────────────────────────
-    is_manifold          = models.BooleanField(null=True)
-    holes_count          = models.IntegerField(null=True)
-    connected_components = models.IntegerField(null=True)
-
-    # ── Shape Descriptors ────────────────────────────────
-    symmetry_axis  = models.CharField(max_length=10, null=True, blank=True)
-    compactness    = models.FloatField(null=True)
-    elongation     = models.FloatField(null=True)
-    curvature_mean = models.FloatField(null=True)
-
-    # ── Physics Proxy ─────────────────────────────────────
-    center_of_mass  = ArrayField(models.FloatField(), size=3, null=True, blank=True)
-    stability_score = models.FloatField(null=True)
-
     # ── Platform Counters ─────────────────────────────────
     views_count     = models.PositiveIntegerField(default=0)
     downloads_count = models.PositiveIntegerField(default=0)

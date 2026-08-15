@@ -382,29 +382,19 @@ except OSError as e:
 
 model_data = {
     "model_id": model_id,
-    "uid": args.uid,
-    "render_params": {
-        "samples": args.samples,
-        "resolution": args.resolution,
-        "gpu_backend": gpu_backend or "CPU",
-        "views_requested": requested_views,
-    },
     "dimensions": {
         "width": width, "depth": depth, "height": height,
         "aspect_hw": aspect_hw, "aspect_hd": aspect_hd, "aspect_wd": aspect_wd,
     },
+    "vertices": total_verts,
+    "faces": total_faces,
     "render_links": {
         "views_count": len(render_links),
         "views": [x["file"] for x in render_links],
     },
-    "model_file": {
-        "stored": model_stored_ok,
-        "path": os.path.relpath(STORED_MODEL_PATH, MODEL_ROOT) if model_stored_ok else None,
-        "filename": os.path.basename(MODEL_PATH),
-    },
     "_debug_raw": {
         "edges": total_edges,
-    },                                                                                                                                                                                                                                                  
+    },
 }
 
 with open(GEOMETRY_PATH, "w", encoding="utf8") as f:
