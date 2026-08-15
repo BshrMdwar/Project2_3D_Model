@@ -107,9 +107,6 @@ class Model3D(models.Model):
     def rating_score(self):
         return self.downloads_count + self.usage_count
 
-    # ── Render Images ─────────────────────────────────────
-    # صور الرندر تُخزَّن في جدول منفصل RenderImage
-
     class Meta:
         ordering            = ['-uploaded_at']
         verbose_name        = '3D Model'
@@ -128,19 +125,6 @@ class Model3D(models.Model):
     def increment_views(self):
         Model3D.objects.filter(pk=self.pk).update(views_count=F('views_count') + 1)
 
-
-# ════════════════════════════════════════════════════════════
-#  RenderImage — صور الرندر المولَّدة من بلندر
-# ════════════════════════════════════════════════════════════
-
-class RenderImage(models.Model):
-    model     = models.ForeignKey(Model3D, on_delete=models.CASCADE, related_name='render_images')
-    image     = models.ImageField(upload_to='models3d/renders/')
-    angle     = models.CharField(max_length=50, blank=True, help_text='e.g. front, side, top')
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Render({self.model_id} — {self.angle})"
 
 
 # ════════════════════════════════════════════════════════════

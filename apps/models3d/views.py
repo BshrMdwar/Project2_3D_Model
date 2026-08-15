@@ -1,15 +1,16 @@
-"""
-views.py — architecture_api v2
-يشمل:
-  • Pipeline رفع ملف 3D → بلندر → AI → قاعدة البيانات
-  • نظام تقييم (downloads + usage)
-  • نظام إبلاغ (Report)
-  • نظام اقتراح ذكي (Recommendation)
-  • وظائف الآدمن الكاملة مع صلاحيات صارمة
-  • لوحة إحصائيات متطورة
-"""
 from __future__ import annotations
 import os
+import uuid
+import subprocess
+import shutil
+
+from django.conf import settings
+from django.core.files import File
+from django.http import JsonResponse
+from django.views import View
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework import permissions, status
 # 1️⃣ الاستيراد الصحيح للدوال الرياضية والـ Expressions
@@ -26,11 +27,9 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 
-from .models import Model3D, Report, Tag, Category, RenderImage
+from .models import Model3D, Report, Tag, Category
 from .serializers import (
     Model3DListSerializer,
-    Model3DDetailSerializer,
-    Model3DImportSerializer,
     Model3DAdminUpdateSerializer,
     Model3DRecommendSerializer,
     ReportCreateSerializer,
@@ -40,10 +39,13 @@ from .serializers import (
 )
 from .filters import Model3DFilter
 
+# ── Blender render pipeline config ────────────────────────────
+TEMP_FOLDER = "./assets/temp"
+PUBLIC_ROOT = "./assets/public"
+BLENDER_EXECUTABLE = ["docker", "compose", "exec", "blender", "blender"]
+RENDER_SCRIPT = "/scripts/renderer.py"
+ALLOWED_EXTENSIONS = {".glb", ".gltf"}
 
-# ════════════════════════════════════════════════════════════
-#  Permission Helpers
-# ════════════════════════════════════════════════════════════
 
 class IsAdminUser(permissions.BasePermission):
     """يسمح فقط للمستخدمين ذوي role=admin أو is_staff"""
@@ -54,11 +56,6 @@ class IsAdminUser(permissions.BasePermission):
             request.user.is_authenticated and
             (request.user.is_staff or getattr(request.user, 'role', '') == 'admin')
         )
-
-
-# ════════════════════════════════════════════════════════════
-#  Model3D — قراءة عامة
-# ════════════════════════════════════════════════════════════
 
 class Model3DListView(generics.ListAPIView):
     """GET /api/models/getAllModels/ — قائمة الموديلات النشطة"""
@@ -79,7 +76,6 @@ class Model3DListView(generics.ListAPIView):
 
 class Model3DDetailView(generics.RetrieveAPIView):
     """GET /api/models/<id>/ — تفاصيل موديل + يزيد عداد المشاهدات"""
-    serializer_class = Model3DDetailSerializer
     permission_classes = [permissions.AllowAny]
     lookup_field = 'id'
 
@@ -113,200 +109,16 @@ class Model3DTopRatedView(generics.ListAPIView):
             .order_by('-rating')[:20]
         )
 
+    def _apply_geometry(self, model, geometry_path):
+        import json
+        if not os.path.isfile(geometry_path):
+            return
+        with open(geometry_path) as f:
+            data = json.load(f)
 
-# ════════════════════════════════════════════════════════════
-#  Model3D — رفع واستيراد
-# ════════════════════════════════════════════════════════════
-
-class Model3DImportView(APIView):
-    """POST /api/models/import/ — استيراد JSON صافٍ من بلندر (admin)"""
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request):
-        serializer = Model3DImportSerializer(data=request.data)
-        if serializer.is_valid():
-            model = serializer.save()
-            return Response({'status': 'imported', 'id': model.id}, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-# class Model3DUploadUserView(APIView):
-#     """
-#     POST /api/models/upload-user/
-#     1. يستقبل ملف 3D (FileField)
-#     2. يرسله لسيرفر بلندر Headless (Colab/Ngrok)
-#     3. يستقبل JSON + تصنيف AI
-#     4. يحفظ في الداتابيز ويعيد الاستجابة الفورية
-#     """
-#     permission_classes = [permissions.IsAuthenticated]
-#     parser_classes     = [MultiPartParser, FormParser]
-
-#     COLAB_API_URL = "https://coeditor-resisting-bogus.ngrok-free.dev/render-and-classify/"
-
-#     def post(self, request, *args, **kwargs):
-#         uploaded_file = request.data.get('file')
-#         if not uploaded_file:
-#             return Response({"error": "No file uploaded"}, status=status.HTTP_400_BAD_REQUEST)
-
-#         try:
-#             files = {
-#                 'file': (uploaded_file.name, uploaded_file.read(), uploaded_file.content_type)
-#             }
-#             colab_response = requests.post(self.COLAB_API_URL, files=files, timeout=120)
-
-#             if colab_response.status_code != 200:
-#                 return Response({
-#                     "error": "Cloud server error during rendering or classification",
-#                     "details": colab_response.text,
-#                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-#             colab_data       = colab_response.json()
-#             ai_classification = colab_data.get('ai_classification', {})
-
-#             internal_import_data = {
-#                 "id":                f"user_{uploaded_file.name.split('.')[0]}",
-#                 "mesh_stats":        colab_data.get('mesh_stats', {}),
-#                 "bounding_box":      colab_data.get('bounding_box'),
-#                 "surface_area":      colab_data.get('surface_area'),
-#                 "volume_estimate":   colab_data.get('volume_estimate'),
-#                 "topology":          colab_data.get('topology', {}),
-#                 "shape_descriptors": colab_data.get('shape_descriptors', {}),
-#                 "physics_proxy":     colab_data.get('physics_proxy', {}),
-#                 "render_links":      colab_data.get('render_links', {}),
-#                 "ai_label":          ai_classification.get('label'),
-#                 "ai_confidence":     ai_classification.get('confidence'),
-#             }
-
-#             serializer = Model3DImportSerializer(data=internal_import_data)
-#             if serializer.is_valid():
-#                 model = serializer.save()
-#                 # ربط المستخدم الرافع
-#                 model.uploaded_by = request.user
-#                 model.save(update_fields=['uploaded_by'])
-
-#                 return Response({
-#                     "status":           "success",
-#                     "message":          "Model uploaded, rendered, and classified successfully!",
-#                     "model_db_id":      model.id,
-#                     "detected_class":   ai_classification.get('label'),
-#                     "confidence_score": ai_classification.get('confidence'),
-#                     "saved_data":       Model3DDetailSerializer(model).data,
-#                 }, status=status.HTTP_201_CREATED)
-
-#             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-#         except requests.exceptions.Timeout:
-#             return Response({"error": "Cloud Render request timed out."}, status=status.HTTP_504_GATEWAY_TIMEOUT)
-#         except requests.exceptions.ConnectionError:
-#             return Response({"error": "Could not connect to Blender server."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-#         except Exception as e:
-#             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-# تأكد من استيراد الـ Serializers والموديلات الخاصة بك هنا
-# from .serializers import Model3DImportSerializer, Model3DDetailSerializer
-
-
-class Model3DUploadUserView(APIView):
-    """
-    POST /api/models/upload-user/
-    1. يستقبل ملف 3D (FileField) من المستخدم.
-    2. يرسله مباشرة إلى API سكريبت بلندر الخاص بك لمعالجته محلياً.
-    3. يستقبل الـ JSON المحسوب من بلندر ويخزنه في قاعدة البيانات.
-    """
-    permission_classes = [permissions.IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
-
-    # 🔗 تم إبقاء الرابط متوافقاً مع سيرفر Flask المحلي الجديد
-    BLENDER_API_URL = "http://127.0.0.1:5000/process-3d/"
-
-    def post(self, request, *args, **kwargs):
-        uploaded_file = request.data.get('file')
-        if not uploaded_file:
-            return Response({"error": "No file uploaded"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            # 📦 تجهيز الملف لإرساله إلى الـ API الخاص ببلندر
-            files = {
-                'file': (uploaded_file.name, uploaded_file.read(), uploaded_file.content_type)
-            }
-
-            # 🔄 حرج جداً: إعادة مؤشر قراءة الملف إلى الصفر
-            # لأن uploaded_file.read() استهلكت البيانات، وبدون الـ seek سيفشل دجانغو بحفظ الملف على القرص.
-            uploaded_file.seek(0)
-
-            # 🚀 إرسال الطلب إلى سيرفر بلندر المحلي
-            # رفعنا الـ timeout لـ 610 ثوانٍ ليتوافق مع معالجة الرندر الثقيلة في بلندر (Cycles)
-            blender_response = requests.post(
-                self.BLENDER_API_URL, files=files, timeout=610)
-
-            if blender_response.status_code != 200:
-                try:
-                    error_details = blender_response.json()
-                except Exception:
-                    error_details = blender_response.text
-
-                return Response({
-                    "error": "Blender local server error during processing",
-                    "details": error_details,
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-            # 📥 استلام البيانات من بلندر
-            blender_data = blender_response.json()
-            ai_classification = blender_data.get('ai_classification', {})
-
-            # 🧱 تفكيك البيانات القادمة وحقنها في الـ Serializer ليتم حفظها في جدول Model3D
-            internal_import_data = {
-                "id":                f"user_{uploaded_file.name.split('.')[0]}",
-                # الآن سيحفظ بشكل سليم بفضل الـ seek(0)
-                "model_file":        uploaded_file,
-                "mesh_stats":        blender_data.get('mesh_stats', {}),
-                "bounding_box":      blender_data.get('bounding_box'),
-                "surface_area":      blender_data.get('surface_area'),
-                "volume_estimate":   blender_data.get('volume_estimate'),
-                "topology":          blender_data.get('topology', {}),
-                "shape_descriptors": blender_data.get('shape_descriptors', {}),
-                "physics_proxy":     blender_data.get('physics_proxy', {}),
-                "render_links":      blender_data.get('render_links', {}),
-                "ai_label":          ai_classification.get('label'),
-                "ai_confidence":     ai_classification.get('confidence'),
-            }
-
-            # نمرر الـ request داخل الـ context للـ serializer كأفضل ممارسة
-            serializer = Model3DImportSerializer(
-                data=internal_import_data, context={'request': request})
-            if serializer.is_valid():
-                # نقوم بحفظ الكائن وتحديد المستخدم مباشرة بدون الحاجة لعمل save مرتين
-                model = serializer.save(uploaded_by=request.user)
-                if uploaded_file:
-                    model.model_file.save(
-                        uploaded_file.name, uploaded_file, save=True)
-                    for i in range(1, 13):
-                        RenderImage.objects.create(
-                            model=model,  # ربط الصورة بالموديل الحالي عبر حقل model
-                            image=f"models3d/renders/{model.id}/angle_{i}.png",  # المسار النسبي المحفوظ على الهارد في الميديا
-                            angle=i * 30  # حساب الزاوية (30, 60, 90... حتى 360)
-                        )
-                return Response({
-                    "status":           "success",
-                    "message":          "Model processed via Blender and saved successfully!",
-                    "model_db_id":      model.id,
-                    "detected_class":   ai_classification.get('label'),
-                    "confidence_score": ai_classification.get('confidence'),
-                    "saved_data":       Model3DDetailSerializer(model).data,
-                }, status=status.HTTP_201_CREATED)
-
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        except requests.exceptions.Timeout:
-            return Response({"error": "Blender local script request timed out (Max 10 minutes)."}, status=status.HTTP_504_GATEWAY_TIMEOUT)
-        except requests.exceptions.ConnectionError:
-            return Response({"error": "Could not connect to local Blender API service. Make sure Flask is running on port 5000."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-# ════════════════════════════════════════════════════════════
-#  Downloads / Usage Counter
-# ════════════════════════════════════════════════════════════
+        dims = data.get("dimensions", {})
+        model.vertices = data.get("_debug_raw", {}).get("edges")
+        model.edges = data.get("_debug_raw", {}).get("edges")
 
 
 class Model3DDownloadView(APIView):
@@ -316,37 +128,9 @@ class Model3DDownloadView(APIView):
     """
     permission_classes = [permissions.IsAuthenticated]
 
-    def post(self, request, id):
-        try:
-            model = Model3D.objects.get(id=id, is_active=True)
-        except Model3D.DoesNotExist:
-            return Response({'error': 'Model not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        model.increment_downloads()
-        return Response({
-            'status':      'download_registered',
-            'model_id':    id,
-            'file_url':    request.build_absolute_uri(model.model_file.url) if model.model_file else None,
-        })
-
-
-# تأكد من استيراد الموديل الخاص بك هنا
-# from .models import Model3D
-
-# تأكد من استيراد الموديل الخاص بك
-# from apps.models3d.models import Model3D
-
-
-class Model3DDownloadView(APIView):
-    """
-    POST /api/models/<id>/download/
-    يسجّل تحميلاً ويعيد الرابط المباشر لتنزيل ملف الـ 3D على جهاز المستخدم.
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
     def post(self, request, id, *args, **kwargs):
+        # 1. جلب الموديل والتأكد أنه نشط
         try:
-            # 1. جلب الموديل والتأكد أنه نشط
             model = Model3D.objects.get(id=id, is_active=True)
         except Model3D.DoesNotExist:
             return Response({'error': 'Model not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -367,9 +151,6 @@ class Model3DDownloadView(APIView):
             'file_url': file_url,
             'message': 'Use this link to download the file directly to your local storage.'
         }, status=status.HTTP_200_OK)
-# ════════════════════════════════════════════════════════════
-#  Stats
-# ════════════════════════════════════════════════════════════
 
 
 class Model3DStatsView(APIView):
@@ -391,10 +172,6 @@ class Model3DStatsView(APIView):
 
 
 class AdminDashboardStatsView(APIView):
-    """
-    GET /api/admin/dashboard-stats/
-    لوحة إحصائيات متطورة للمشرفين.
-    """
     permission_classes = [IsAdminUser]
 
     def get(self, request):
@@ -616,6 +393,8 @@ class CategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     permission_classes = [IsAdminUser]
+
+
 class Model3DRendersListView(APIView):
     """
     GET /api/models/<id>/renders/
@@ -624,19 +403,128 @@ class Model3DRendersListView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request, id):
-        try:
-            model_instance = Model3D.objects.get(id=id, is_active=True)
-        except Model3D.DoesNotExist:
-            return Response({'error': 'Model not found'}, status=status.HTTP_404_NOT_FOUND)
-            
-        # 🚨 التعديل هنا: استبدال model_3d بـ model بناءً على بنية قاعدة البيانات عندك
-        renders = RenderImage.objects.filter(model=model_instance)
-        
-        # تجميع روابط الصور بشكل مطلق ومباشر
-        urls = [request.build_absolute_uri(img.image.url) for img in renders if img.image]
-        
+        # try:
+        #     model_instance = Model3D.objects.get(id=id, is_active=True)
+        # except Model3D.DoesNotExist:
+        #     return Response({'error': 'Model not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # # 🚨 التعديل هنا: استبدال model_3d بـ model بناءً على بنية قاعدة البيانات عندك
+        # renders = RenderImage.objects.filter(model=model_instance)
+
+        # # تجميع روابط الصور بشكل مطلق ومباشر
+        # urls = [request.build_absolute_uri(img.image.url) for img in renders if img.image]
+
         return Response({
             "model_id": id,
-            "renders_count": len(urls),
-            "images": urls
+            # "renders_count": len(urls),
+            # "images": urls
         }, status=status.HTTP_200_OK)
+
+
+# ════════════════════════════════════════════════════════════
+#  Upload — رفع الموديل وتشغيل خط الرندر عبر Blender
+# ════════════════════════════════════════════════════════════
+
+@method_decorator(csrf_exempt, name='dispatch')
+class Model3DUploadView(View):
+    """
+    POST /api/models/upload/
+    يستقبل ملف .glb/.gltf، يحفظه مؤقتاً، يشغّل بلندر داخل حاوية Docker
+    لتوليد الرندر والـ geometry.json، ثم يربط الموديل النهائي بسجل قاعدة البيانات.
+    """
+
+    def post(self, request):
+        uploaded_file = request.FILES.get("model")
+        if not uploaded_file:
+            return JsonResponse({"error": "No file provided under 'model'."}, status=400)
+
+        ext = os.path.splitext(uploaded_file.name)[1].lower()
+        if ext not in ALLOWED_EXTENSIONS:
+            return JsonResponse(
+                {"error": f"Unsupported extension '{ext}'. Use .glb or .gltf."},
+                status=400,
+            )
+
+        model_id = uuid.uuid4().hex
+
+        # Save the upload into TEMP_FOLDER under a name derived from the id,
+        # so it matches what the script's MODEL_IN_TEMP check expects.
+        os.makedirs(TEMP_FOLDER, exist_ok=True)
+        temp_filename = f"{model_id}{ext}"
+        temp_path = os.path.join(TEMP_FOLDER, temp_filename)
+
+        with open(temp_path, "wb") as dest:
+            for chunk in uploaded_file.chunks():
+                dest.write(chunk)
+
+        # Create the DB row first so we have something to update/rollback
+        # against even if the render fails.
+        model = Model3D.objects.create(
+            id=model_id,
+            source_file=uploaded_file.name,
+        )
+
+        cmd = [
+            *BLENDER_EXECUTABLE,
+            "-b",
+            "--python", RENDER_SCRIPT,
+            "--",
+            "--model", temp_filename,
+            "--uid", model_id,
+        ]
+
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=900,
+                check=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            model.is_active = False
+            model.save(update_fields=["is_active"])
+            return JsonResponse(
+                {
+                    "error": "Render failed.",
+                    "returncode": exc.returncode,
+                    "stderr": exc.stderr[-4000:],  # tail, in case it's huge
+                },
+                status=500,
+            )
+        except subprocess.TimeoutExpired:
+            model.is_active = False
+            model.save(update_fields=["is_active"])
+            return JsonResponse({"error": "Render timed out."}, status=504)
+
+        # Pull the geometry.json the script wrote and populate the row.
+        geometry_path = os.path.join(PUBLIC_ROOT, model_id, "geometry", "geometry.json")
+        self._apply_geometry(model, geometry_path)
+
+        # Point model_file at the persisted copy the script wrote under
+        # PUBLIC_ROOT/<uid>/model/, if it saved successfully.
+        stored_model_dir = os.path.join(PUBLIC_ROOT, model_id, "model")
+        if os.path.isdir(stored_model_dir):
+            files = os.listdir(stored_model_dir)
+            if files:
+                stored_path = os.path.join(stored_model_dir, files[0])
+                with open(stored_path, "rb") as f:
+                    model.model_file.save(files[0], File(f), save=False)
+
+        model.save()
+
+        return JsonResponse({
+            "id": model.id,
+            "status": "rendered",
+            "renders_dir": os.path.join(PUBLIC_ROOT, model_id, "renders"),
+        })
+
+    def _apply_geometry(self, model, geometry_path):
+        import json
+        if not os.path.isfile(geometry_path):
+            return
+        with open(geometry_path) as f:
+            data = json.load(f)
+
+        model.vertices = data.get("_debug_raw", {}).get("edges")
+        model.edges = data.get("_debug_raw", {}).get("edges")

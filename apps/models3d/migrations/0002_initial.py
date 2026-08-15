@@ -21,11 +21,6 @@ class Migration(migrations.Migration):
             field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='uploaded_models', to=settings.AUTH_USER_MODEL),
         ),
         migrations.AddField(
-            model_name='renderimage',
-            name='model',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='render_images', to='models3d.model3d'),
-        ),
-        migrations.AddField(
             model_name='report',
             name='model',
             field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='reports', to='models3d.model3d'),

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Model3D, Report, Tag, Category, RenderImage
+from .models import Model3D, Report, Tag, Category
 
 
 @admin.register(Tag)
@@ -14,10 +14,6 @@ class CategoryAdmin(admin.ModelAdmin):
     search_fields = ('name',)
 
 
-@admin.register(RenderImage)
-class RenderImageAdmin(admin.ModelAdmin):
-    list_display = ('id', 'model', 'angle', 'created_at')
-    list_filter  = ('angle',)
 
 
 @admin.register(Report)
@@ -27,11 +23,6 @@ class ReportAdmin(admin.ModelAdmin):
     search_fields = ('model__id', 'reporter__email')
     list_editable = ('status',)
 
-
-class RenderImageInline(admin.TabularInline):
-    model  = RenderImage
-    extra  = 0
-    fields = ('image', 'angle')
 
 
 @admin.register(Model3D)
@@ -44,5 +35,4 @@ class Model3DAdmin(admin.ModelAdmin):
     search_fields = ('id', 'ai_label')
     list_editable = ('is_active',)
     filter_horizontal = ('tags',)
-    inlines = [RenderImageInline]
     readonly_fields = ('uploaded_at', 'updated_at')
