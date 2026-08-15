@@ -39,7 +39,6 @@ from .serializers import (
 )
 from .filters import Model3DFilter
 
-# ── Blender render pipeline config ────────────────────────────
 TEMP_FOLDER = "./assets/temp"
 PUBLIC_ROOT = "./assets/public"
 BLENDER_EXECUTABLE = ["docker", "compose", "exec", "blender", "blender"]
@@ -48,8 +47,6 @@ ALLOWED_EXTENSIONS = {".glb", ".gltf"}
 
 
 class IsAdminUser(permissions.BasePermission):
-    """يسمح فقط للمستخدمين ذوي role=admin أو is_staff"""
-
     def has_permission(self, request, view):
         return (
             request.user and
@@ -76,6 +73,7 @@ class Model3DListView(generics.ListAPIView):
 
 class Model3DDetailView(generics.RetrieveAPIView):
     """GET /api/models/<id>/ — تفاصيل موديل + يزيد عداد المشاهدات"""
+    serializer_class = Model3DListSerializer
     permission_classes = [permissions.AllowAny]
     lookup_field = 'id'
 

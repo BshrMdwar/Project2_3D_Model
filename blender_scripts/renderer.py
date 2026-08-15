@@ -404,7 +404,7 @@ model_data = {
     },
     "_debug_raw": {
         "edges": total_edges,
-    },
+    },                                                                                                                                                                                                                                                  
 }
 
 with open(GEOMETRY_PATH, "w", encoding="utf8") as f:

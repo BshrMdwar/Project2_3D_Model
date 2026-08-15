@@ -30,8 +30,7 @@ class Model3DListSerializer(serializers.ModelSerializer):
             'id', 'source_file', 'uploaded_at', 'is_active',
             'ai_label', 'ai_confidence',
             'category', 'tags',
-            'vertices', 'faces', 'is_manifold',
-            'stability_score', 'elongation',
+            'vertices', 'faces',
             'views_count', 'downloads_count', 'usage_count', 'rating_score',
         )
 
