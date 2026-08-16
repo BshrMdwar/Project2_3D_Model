@@ -16,7 +16,7 @@ from django.utils.decorators import method_decorator
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework import permissions, status
 # 1️⃣ الاستيراد الصحيح للدوال الرياضية والـ Expressions
-from django.db.models import ExpressionWrapper, IntegerField, F, Q
+from django.db.models import Case, When, Value,  ExpressionWrapper, IntegerField, F, Q
 # لحماية حقول الـ Null أثناء الجمع
 from django.db.models.functions import Coalesce
 import requests
@@ -28,16 +28,16 @@ from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from itertools import chain
 
-from .models import Model3D, Report, Tag, Category
+from django.shortcuts import get_object_or_404
+
+from .models import Model3D, Report
 from .serializers import (
     Model3DListSerializer,
-    Model3DAdminUpdateSerializer,
     Model3DRecommendSerializer,
     ReportCreateSerializer,
     ReportDetailSerializer,
-    TagSerializer,
-    CategorySerializer,
 )
 from .filters import Model3DFilter
 
@@ -239,7 +239,6 @@ class AdminModel3DListView(generics.ListAPIView):
 class AdminModel3DUpdateView(generics.UpdateAPIView):
     """PATCH /api/admin/models/<id>/update/ — تعديل التصنيف والوسوم والإخفاء"""
     queryset = Model3D.objects.all()
-    serializer_class = Model3DAdminUpdateSerializer
     permission_classes = [IsAdminUser]
     lookup_field = 'id'
     http_method_names = ['patch']
@@ -360,37 +359,6 @@ class Model3DRecommendView(APIView):
             'recommendations':  serializer.data,
         })
 
-
-# ════════════════════════════════════════════════════════════
-#  Tag & Category CRUD — للآدمن
-# ════════════════════════════════════════════════════════════
-
-class TagListCreateView(generics.ListCreateAPIView):
-    """GET|POST /api/admin/tags/"""
-    queryset = Tag.objects.all()
-    serializer_class = TagSerializer
-    permission_classes = [IsAdminUser]
-
-
-class TagDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """GET|PATCH|DELETE /api/admin/tags/<pk>/"""
-    queryset = Tag.objects.all()
-    serializer_class = TagSerializer
-    permission_classes = [IsAdminUser]
-
-
-class CategoryListCreateView(generics.ListCreateAPIView):
-    """GET|POST /api/admin/categories/"""
-    queryset = Category.objects.all()
-    serializer_class = CategorySerializer
-    permission_classes = [IsAdminUser]
-
-
-class CategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """GET|PATCH|DELETE /api/admin/categories/<pk>/"""
-    queryset = Category.objects.all()
-    serializer_class = CategorySerializer
-    permission_classes = [IsAdminUser]
 
 
 class Model3DRendersListView(APIView):
@@ -691,3 +659,82 @@ class Model3DUploadView(View):
         model.material = materials_primary.get("label")
 
         model.prediction = prediction
+
+
+
+
+class SimiliarModelsView(APIView):
+    def get(self, request):
+        model_id = request.query_params.get('model_id')
+        if not model_id:
+            return Response(
+                {"detail": "model_id query param is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        reference = get_object_or_404(Model3D, pk=model_id)
+
+        try:
+            limit = int(request.query_params.get('limit', 12))
+        except ValueError:
+            limit = 12
+        limit = max(1, min(limit, 100))
+
+        label_quota = round(limit * 0.7)
+        style_quota = limit - label_quota
+
+        base_qs = Model3D.objects.filter(is_active=True).exclude(pk=reference.pk)
+
+        seen_ids = {reference.pk}
+
+        # ── Bucket 1: same ai_label, favoring same object_category ──
+        label_results = []
+        if reference.ai_label:
+            label_qs = (
+                base_qs
+                .filter(ai_label=reference.ai_label)
+                .annotate(
+                    category_match=Case(
+                        When(object_category=reference.object_category, then=Value(1)),
+                        default=Value(0),
+                        output_field=IntegerField(),
+                    ),
+                    rating_score_annot=F('downloads_count') + F('usage_count'),
+                )
+                .order_by('-category_match', '-rating_score_annot', '-uploaded_at')
+            )
+            label_results = list(label_qs[:label_quota])
+            seen_ids.update(m.pk for m in label_results)
+
+        # ── Bucket 2: same style ──
+        style_results = []
+        if reference.style:
+            style_qs = (
+                base_qs
+                .exclude(pk__in=seen_ids)
+                .filter(style=reference.style)
+                .annotate(rating_score_annot=F('downloads_count') + F('usage_count'))
+                .order_by('-rating_score_annot', '-uploaded_at')
+            )
+            style_results = list(style_qs[:style_quota])
+            seen_ids.update(m.pk for m in style_results)
+
+        results = label_results + style_results
+
+        # ── Fallback: if either bucket came up short, top up from
+        # whatever's left (prefer the other bucket's criteria first,
+        # then just generally popular active models) ──
+        missing = limit - len(results)
+        if missing > 0:
+            fallback_qs = (
+                base_qs
+                .exclude(pk__in=seen_ids)
+                .annotate(rating_score_annot=F('downloads_count') + F('usage_count'))
+                .order_by('-rating_score_annot', '-uploaded_at')
+            )
+            fallback_results = list(fallback_qs[:missing])
+            results += fallback_results
+            seen_ids.update(m.pk for m in fallback_results)
+
+        serializer = Model3DListSerializer(results, many=True)
+        return Response(serializer.data)

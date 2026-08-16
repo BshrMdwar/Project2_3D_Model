@@ -1,19 +1,5 @@
 from rest_framework import serializers
-from .models import Model3D, Report, Tag, Category
-
-
-# ── Tag & Category ────────────────────────────────────────
-
-class TagSerializer(serializers.ModelSerializer):
-    class Meta:
-        model  = Tag
-        fields = ('id', 'name')
-
-
-class CategorySerializer(serializers.ModelSerializer):
-    class Meta:
-        model  = Category
-        fields = ('id', 'name', 'description')
+from .models import Model3D, Report
 
 
 
@@ -21,17 +7,13 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class Model3DListSerializer(serializers.ModelSerializer):
     rating_score = serializers.IntegerField(read_only=True)
-    category     = CategorySerializer(read_only=True)
-    tags         = TagSerializer(many=True, read_only=True)
-
     class Meta:
         model  = Model3D
         fields = (
             'id', 'title', 'description', 'banner_url', 'model_url','uploaded_at', 'is_active',
             'ai_label', 'ai_confidence',
-            'category', 'tags',
             'vertices', 'faces',
-            'views_count', 'downloads_count', 'usage_count', 'rating_score',
+            'views_count', 'downloads_count', 'usage_count', 'rating_score', 'prediction'
         )
 
 
@@ -80,30 +62,7 @@ class Model3DRecommendSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Model3D
         fields = (
-            'id', 'ai_label', 'category',
+            'id', 'ai_label',
             'vertices', 'faces',
             'downloads_count', 'usage_count', 'rating_score',
         )
-
-
-# ── Admin: update tags/category on a model ────────────────
-
-class Model3DAdminUpdateSerializer(serializers.ModelSerializer):
-    """يتيح للآدمن تعديل الوسوم والتصنيف وحالة الإخفاء"""
-    tag_ids      = serializers.PrimaryKeyRelatedField(
-        queryset=Tag.objects.all(), many=True, source='tags', required=False
-    )
-    category_id  = serializers.PrimaryKeyRelatedField(
-        queryset=Category.objects.all(), source='category', required=False, allow_null=True
-    )
-
-    class Meta:
-        model  = Model3D
-        fields = ('is_active', 'ai_label', 'category_id', 'tag_ids')
-
-    def update(self, instance, validated_data):
-        tags = validated_data.pop('tags', None)
-        instance = super().update(instance, validated_data)
-        if tags is not None:
-            instance.tags.set(tags)
-        return instance

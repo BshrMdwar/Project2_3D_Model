@@ -5,6 +5,7 @@ from .views import (
     Model3DDetailView,
     Model3DTopRatedView,
     Model3DUploadView,
+    SimiliarModelsView,
     # Model3DDownloadView,
     Model3DDeleteView,
     Model3DStatsView,
@@ -19,17 +20,13 @@ from .views import (
     AdminReportListView,
     AdminReportUpdateView,
     AdminDashboardStatsView,
-    TagListCreateView,
-    TagDetailView,
-    CategoryListCreateView,
-    CategoryDetailView,
 )
 
 urlpatterns = [
 
     # ── Upload & Import ────────────────────────────────────
     path('upload-user/',   Model3DUploadView.as_view(), name='model-upload-user'),
-
+    path('similar-models/', SimiliarModelsView.as_view(), name='similar-models'),
     # ── Read ───────────────────────────────────────────────
     path('',   Model3DListView.as_view(),       name='model-list'),
     path('top-rated/',     Model3DTopRatedView.as_view(),   name='model-top-rated'),
@@ -50,9 +47,9 @@ urlpatterns = [
     path('admin/reports/',                 AdminReportListView.as_view(),       name='admin-report-list'),
     path('admin/reports/<int:pk>/',        AdminReportUpdateView.as_view(),     name='admin-report-update'),
     path('admin/dashboard-stats/',         AdminDashboardStatsView.as_view(),   name='admin-dashboard-stats'),
-    path('admin/tags/',                    TagListCreateView.as_view(),          name='admin-tag-list'),
-    path('admin/tags/<int:pk>/',           TagDetailView.as_view(),             name='admin-tag-detail'),
-    path('admin/categories/',              CategoryListCreateView.as_view(),     name='admin-category-list'),
-    path('admin/categories/<int:pk>/',     CategoryDetailView.as_view(),         name='admin-category-detail'),
+    # path('admin/tags/',                    TagListCreateView.as_view(),          name='admin-tag-list'),
+    # path('admin/tags/<int:pk>/',           TagDetailView.as_view(),             name='admin-tag-detail'),
+    # path('admin/categories/',              CategoryListCreateView.as_view(),     name='admin-category-list'),
+    # path('admin/categories/<int:pk>/',     CategoryDetailView.as_view(),         name='admin-category-detail'),
     # path('<str:id>/download/',     Model3DDownloadView.as_view(), name='admin-model-download'),
 ]

@@ -6,39 +6,8 @@ from django.db.models import F
 User = get_user_model()
 
 
-# ════════════════════════════════════════════════════════════
-#  Tag & Category — كيانات مستقلة قابلة للإعادة في أي موديل
-# ════════════════════════════════════════════════════════════
-
-class Tag(models.Model):
-    name = models.CharField(max_length=60, unique=True)
-
-    def __str__(self):
-        return self.name
-# الترتيب حسب الاسم لتسهيل البحث في واجهة الإدارة
-    class Meta:
-        ordering = ['name']
-
-
-class Category(models.Model):
-    name        = models.CharField(max_length=100, unique=True)
-    description = models.TextField(blank=True)
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        verbose_name_plural = 'Categories'
-        ordering = ['name']
-
-
-# ════════════════════════════════════════════════════════════
-#  Model3D — الجدول الرئيسي (موسَّع)
-# ════════════════════════════════════════════════════════════
-
 class Model3D(models.Model):
 
-    # ── Identity ─────────────────────────────────────────
     id          = models.CharField(max_length=100, primary_key=True, db_index=True)
     title = models.CharField(max_length=100)
     description = models.CharField(blank=True,null=True)
@@ -46,7 +15,7 @@ class Model3D(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True)
     updated_at  = models.DateTimeField(auto_now=True)
 
-    # رابط بالمستخدم الذي رفع الموديل (اختياري للتوافق مع البيانات القديمة)
+
     model_url = models.CharField(blank=True, null=True)
     banner_url = models.CharField(blank=True, null=True)
 
@@ -56,7 +25,6 @@ class Model3D(models.Model):
         related_name='uploaded_models'
     )
 
-    # Soft-delete / إخفاء
     is_active = models.BooleanField(default=True)
 
     # ── AI Classification ─────────────────────────────────
@@ -66,14 +34,6 @@ class Model3D(models.Model):
     object_category = models.CharField(blank=True, null=True)
     style = models.CharField(blank=True, null=True)
     prediction = models.JSONField(blank=True, null=True)
-
-    # ── Taxonomy ─────────────────────────────────────────
-    category = models.ForeignKey(
-        Category, null=True, blank=True,
-        on_delete=models.SET_NULL,
-        related_name='models'
-    )
-    tags = models.ManyToManyField(Tag, blank=True, related_name='models')
 
     # ── Mesh Stats ────────────────────────────────────────
     vertices = models.IntegerField(null=True)
