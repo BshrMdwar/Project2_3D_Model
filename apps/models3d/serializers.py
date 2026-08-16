@@ -27,7 +27,7 @@ class Model3DListSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Model3D
         fields = (
-            'id', 'source_file', 'uploaded_at', 'is_active',
+            'id', 'uploaded_at', 'is_active',
             'ai_label', 'ai_confidence',
             'category', 'tags',
             'vertices', 'faces',
@@ -81,7 +81,7 @@ class Model3DRecommendSerializer(serializers.ModelSerializer):
         model  = Model3D
         fields = (
             'id', 'ai_label', 'category',
-            'vertices', 'faces', 'stability_score',
+            'vertices', 'faces',
             'downloads_count', 'usage_count', 'rating_score',
         )
 

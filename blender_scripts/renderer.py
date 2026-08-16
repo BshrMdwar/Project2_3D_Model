@@ -81,6 +81,15 @@ STORED_MODEL_PATH = os.path.join(MODEL_STORE_ROOT, os.path.basename(MODEL_PATH))
 # =========================================
 # GPU ACTIVATION
 # =========================================
+def get_available_denoisers():
+    try:
+        return {item.identifier for item in
+                scene.cycles.bl_rna.properties["denoiser"].enum_items}
+    except Exception:
+        return {"OPENIMAGEDENOISE"}
+
+
+available_denoisers = get_available_denoisers()
 
 
 def enable_gpu_rendering(preferred_backend="OPTIX"):
@@ -99,18 +108,25 @@ def enable_gpu_rendering(preferred_backend="OPTIX"):
             continue
         cprefs.get_devices()
         gpu_devices = [d for d in cprefs.devices if d.type in ("OPTIX", "CUDA")]
-        if gpu_devices:
-            activated_backend = backend
-            break
+        if not gpu_devices:
+            continue
+
+        # Enable devices for this backend, then verify the denoiser enum
+        # actually offers this backend before trusting it.
+        for device in cprefs.devices:
+            device.use = device.type == backend
+        available = get_available_denoisers()
+        if backend == "OPTIX" and "OPTIX" not in available:
+            print(f"[GPU] {backend} device listed but not actually usable "
+                  f"(denoiser enum: {available}) — trying next backend.")
+            continue
+
+        activated_backend = backend
+        break
 
     if activated_backend is None:
-        print("[GPU] No compatible GPU device found (OPTIX/CUDA) — falling back to CPU.")
+        print("[GPU] No fully-working GPU backend found — falling back to CPU.")
         return None
-
-    for device in cprefs.devices:
-        device.use = device.type == activated_backend
-        if device.use:
-            print(f"[GPU] Enabling device: {device.name} ({device.type})")
 
     print(f"[GPU] GPU rendering enabled via: {activated_backend}")
     return activated_backend
@@ -121,13 +137,11 @@ gpu_backend = enable_gpu_rendering(preferred_backend=args.gpu_backend)
 # =========================================
 # RENDER SETTINGS
 # =========================================
-
 scene = bpy.context.scene
 scene.render.engine = "CYCLES"
 scene.cycles.device = "GPU" if gpu_backend else "CPU"
 scene.cycles.samples = args.samples
-scene.cycles.use_denoising = True
-scene.cycles.denoiser = "OPTIX" if gpu_backend else "OPENIMAGEDENOISE"
+scene.cycles.use_denoising = False
 scene.cycles.use_adaptive_sampling = True
 scene.cycles.adaptive_threshold = 0.01
 scene.cycles.max_bounces = 4
@@ -136,6 +150,14 @@ scene.cycles.glossy_bounces = 2
 scene.cycles.transmission_bounces = 8
 scene.cycles.transparent_max_bounces = 8
 
+if gpu_backend == "OPTIX" and "OPTIX" in available_denoisers:
+    scene.cycles.denoiser = "OPTIX"
+elif "OPENIMAGEDENOISE" in available_denoisers:
+    scene.cycles.denoiser = "OPENIMAGEDENOISE"
+else:
+    scene.cycles.denoiser = next(iter(available_denoisers))
+
+print(f"[DENOISER] Using: {scene.cycles.denoiser} (available: {available_denoisers})")
 scene.view_settings.view_transform = "AgX"
 scene.view_settings.look = "AgX - High Contrast"
 scene.render.resolution_x = args.resolution

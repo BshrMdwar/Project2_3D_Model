@@ -53,8 +53,6 @@ class Migration(migrations.Migration):
             name='Model3D',
             fields=[
                 ('id', models.CharField(db_index=True, max_length=100, primary_key=True, serialize=False)),
-                ('source_file', models.CharField(blank=True, max_length=255, null=True)),
-                ('model_file', models.FileField(blank=True, null=True, upload_to='models3d/files/')),
                 ('uploaded_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('is_active', models.BooleanField(default=True)),
@@ -69,6 +67,7 @@ class Migration(migrations.Migration):
                 ('downloads_count', models.PositiveIntegerField(default=0)),
                 ('usage_count', models.PositiveIntegerField(default=0)),
                 ('category', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='models', to='models3d.category')),
+                ('prediction', models.JSONField(null=True))
             ],
             options={
                 'verbose_name': '3D Model',

@@ -5,7 +5,7 @@ from .views import (
     Model3DDetailView,
     Model3DTopRatedView,
     Model3DUploadView,
-    Model3DDownloadView,
+    # Model3DDownloadView,
     Model3DDeleteView,
     Model3DStatsView,
     Model3DRecommendView,
@@ -54,5 +54,5 @@ urlpatterns = [
     path('admin/tags/<int:pk>/',           TagDetailView.as_view(),             name='admin-tag-detail'),
     path('admin/categories/',              CategoryListCreateView.as_view(),     name='admin-category-list'),
     path('admin/categories/<int:pk>/',     CategoryDetailView.as_view(),         name='admin-category-detail'),
-    path('<str:id>/download/',     Model3DDownloadView.as_view(), name='admin-model-download'),
+    # path('<str:id>/download/',     Model3DDownloadView.as_view(), name='admin-model-download'),
 ]

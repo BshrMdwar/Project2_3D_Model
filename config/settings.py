@@ -128,3 +128,7 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'API for managing 3D architectural models, renders & metadata',
     'VERSION':     '1.0.0',
 }
+PREDICTION_API_URL = os.getenv(
+    "PREDICTION_API_URL",
+    "http://localhost:8001",
+)

@@ -40,10 +40,6 @@ class Model3D(models.Model):
 
     # ── Identity ─────────────────────────────────────────
     id          = models.CharField(max_length=100, primary_key=True, db_index=True)
-    source_file = models.CharField(max_length=255, null=True, blank=True)
-
-    # حقل رفع الملف الفعلي (.fbx / .obj / …)
-    model_file  = models.FileField(upload_to='models3d/files/', null=True, blank=True)
 
     uploaded_at = models.DateTimeField(auto_now_add=True)
     updated_at  = models.DateTimeField(auto_now=True)

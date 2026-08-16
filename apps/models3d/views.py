@@ -3,7 +3,7 @@ import os
 import uuid
 import subprocess
 import shutil
-
+import httpx
 from django.conf import settings
 from django.core.files import File
 from django.http import JsonResponse
@@ -119,36 +119,36 @@ class Model3DTopRatedView(generics.ListAPIView):
         model.edges = data.get("_debug_raw", {}).get("edges")
 
 
-class Model3DDownloadView(APIView):
-    """
-    POST /api/models/<id>/download/
-    يسجّل تحميلاً ويعيد URL أو البيانات اللازمة للتحميل.
-    """
-    permission_classes = [permissions.IsAuthenticated]
+# class Model3DDownloadView(APIView):
+#     """
+#     POST /api/models/<id>/download/
+#     يسجّل تحميلاً ويعيد URL أو البيانات اللازمة للتحميل.
+#     """
+#     permission_classes = [permissions.IsAuthenticated]
 
-    def post(self, request, id, *args, **kwargs):
-        # 1. جلب الموديل والتأكد أنه نشط
-        try:
-            model = Model3D.objects.get(id=id, is_active=True)
-        except Model3D.DoesNotExist:
-            return Response({'error': 'Model not found'}, status=status.HTTP_404_NOT_FOUND)
+#     def post(self, request, id, *args, **kwargs):
+#         # 1. جلب الموديل والتأكد أنه نشط
+#         try:
+#             model = Model3D.objects.get(id=id, is_active=True)
+#         except Model3D.DoesNotExist:
+#             return Response({'error': 'Model not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # 2. التأكد من أن حقل الملف ليس فارغاً في قاعدة البيانات
-        if not model.model_file:
-            return Response({'error': 'No file associated with this model record'}, status=status.HTTP_400_BAD_REQUEST)
+#         # 2. التأكد من أن حقل الملف ليس فارغاً في قاعدة البيانات
+#         if not model.model_file:
+#             return Response({'error': 'No file associated with this model record'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 3. تسجيل عملية التحميل وزيادة العداد عبر دالتك الخاصة
-        model.increment_downloads()
+#         # 3. تسجيل عملية التحميل وزيادة العداد عبر دالتك الخاصة
+#         model.increment_downloads()
 
-        # 4. بناء الرابط المطلق الكامل للملف (مثال: http://127.0.0.1:8000/media/models/...)
-        file_url = request.build_absolute_uri(model.model_file.url)
+#         # 4. بناء الرابط المطلق الكامل للملف (مثال: http://127.0.0.1:8000/media/models/...)
+#         file_url = request.build_absolute_uri(model.model_file.url)
 
-        return Response({
-            'status': 'download_registered',
-            'model_id': id,
-            'file_url': file_url,
-            'message': 'Use this link to download the file directly to your local storage.'
-        }, status=status.HTTP_200_OK)
+#         return Response({
+#             'status': 'download_registered',
+#             'model_id': id,
+#             'file_url': file_url,
+#             'message': 'Use this link to download the file directly to your local storage.'
+#         }, status=status.HTTP_200_OK)
 
 
 class Model3DStatsView(APIView):
@@ -416,57 +416,57 @@ class Model3DRendersListView(APIView):
             # "images": urls
         }, status=status.HTTP_200_OK)
 
-
-# ════════════════════════════════════════════════════════════
-#  Upload — رفع الموديل وتشغيل خط الرندر عبر Blender
-# ════════════════════════════════════════════════════════════
-
-@method_decorator(csrf_exempt, name='dispatch')
+@method_decorator(csrf_exempt, name="dispatch")
 class Model3DUploadView(View):
-    """
-    POST /api/models/upload/
-    يستقبل ملف .glb/.gltf، يحفظه مؤقتاً، يشغّل بلندر داخل حاوية Docker
-    لتوليد الرندر والـ geometry.json، ثم يربط الموديل النهائي بسجل قاعدة البيانات.
-    """
 
     def post(self, request):
-        uploaded_file = request.FILES.get("model")
-        if not uploaded_file:
-            return JsonResponse({"error": "No file provided under 'model'."}, status=400)
+        uploaded_model = request.FILES.get("model")
 
-        ext = os.path.splitext(uploaded_file.name)[1].lower()
+        if not uploaded_model:
+            return JsonResponse(
+                {"error": "No file provided under 'model'."},
+                status=400,
+            )
+
+        ext = os.path.splitext(uploaded_model.name)[1].lower()
+
         if ext not in ALLOWED_EXTENSIONS:
             return JsonResponse(
-                {"error": f"Unsupported extension '{ext}'. Use .glb or .gltf."},
+                {
+                    "error": (
+                        f"Unsupported extension '{ext}'. "
+                        "Use .glb or .gltf."
+                    )
+                },
                 status=400,
             )
 
         model_id = uuid.uuid4().hex
 
-        # Save the upload into TEMP_FOLDER under a name derived from the id,
-        # so it matches what the script's MODEL_IN_TEMP check expects.
         os.makedirs(TEMP_FOLDER, exist_ok=True)
+
         temp_filename = f"{model_id}{ext}"
         temp_path = os.path.join(TEMP_FOLDER, temp_filename)
 
         with open(temp_path, "wb") as dest:
-            for chunk in uploaded_file.chunks():
+            for chunk in uploaded_model.chunks():
                 dest.write(chunk)
 
-        # Create the DB row first so we have something to update/rollback
-        # against even if the render fails.
         model = Model3D.objects.create(
             id=model_id,
-            source_file=uploaded_file.name,
+            source_file=uploaded_model.name,
         )
 
         cmd = [
             *BLENDER_EXECUTABLE,
             "-b",
-            "--python", RENDER_SCRIPT,
+            "--python",
+            RENDER_SCRIPT,
             "--",
-            "--model", temp_filename,
-            "--uid", model_id,
+            "--model",
+            temp_filename,
+            "--uid",
+            model_id,
         ]
 
         try:
@@ -477,48 +477,174 @@ class Model3DUploadView(View):
                 timeout=900,
                 check=True,
             )
+
         except subprocess.CalledProcessError as exc:
             model.is_active = False
             model.save(update_fields=["is_active"])
+
             return JsonResponse(
                 {
                     "error": "Render failed.",
                     "returncode": exc.returncode,
-                    "stderr": exc.stderr[-4000:],  # tail, in case it's huge
+                    "stderr": exc.stderr[-4000:],
                 },
                 status=500,
             )
+
         except subprocess.TimeoutExpired:
             model.is_active = False
             model.save(update_fields=["is_active"])
-            return JsonResponse({"error": "Render timed out."}, status=504)
 
-        # Pull the geometry.json the script wrote and populate the row.
-        geometry_path = os.path.join(PUBLIC_ROOT, model_id, "geometry", "geometry.json")
+            return JsonResponse(
+                {"error": "Render timed out."},
+                status=504,
+            )
+        geometry_path = os.path.join(
+            PUBLIC_ROOT,
+            model_id,
+            "geometry",
+            "geometry.json",
+        )
+
         self._apply_geometry(model, geometry_path)
 
-        # Point model_file at the persisted copy the script wrote under
-        # PUBLIC_ROOT/<uid>/model/, if it saved successfully.
-        stored_model_dir = os.path.join(PUBLIC_ROOT, model_id, "model")
-        if os.path.isdir(stored_model_dir):
-            files = os.listdir(stored_model_dir)
-            if files:
-                stored_path = os.path.join(stored_model_dir, files[0])
-                with open(stored_path, "rb") as f:
-                    model.model_file.save(files[0], File(f), save=False)
+        model_banner = request.FILES.get("banner")
+
+        banner_dir = os.path.join(
+            PUBLIC_ROOT,
+            model_id
+        )
+
+        if model_banner:
+            os.makedirs(banner_dir, exist_ok=True)
+
+            banner_path = os.path.join(
+                banner_dir,
+                'banner',
+            )
+
+            with open(banner_path, "wb") as dest:
+                for chunk in model_banner.chunks():
+                    dest.write(chunk)
+
+        else:
+            renders_dir = os.path.join(
+                PUBLIC_ROOT,
+                model_id,
+                "renders",
+            )
+
+            preferred_path = os.path.join(
+                renders_dir,
+                "front_left_high.png",
+            )
+
+            if os.path.isfile(preferred_path):
+                os.makedirs(banner_dir, exist_ok=True)
+
+                banner_path = os.path.join(
+                    banner_dir,
+                    "banner.png",
+                )
+
+                shutil.copy2(
+                    preferred_path,
+                    banner_path,
+                )
 
         model.save()
 
-        return JsonResponse({
-            "id": model.id,
-            "status": "rendered",
-            "renders_dir": os.path.join(PUBLIC_ROOT, model_id, "renders"),
-        })
+        # ---------------------------------------------------------
+        # CALL FASTAPI PREDICTION SERVICE
+        # ---------------------------------------------------------
+
+        prediction = self._run_prediction(model_id)
+
+        if prediction is None:
+            return JsonResponse(
+                {
+                    "id": model.id,
+                    "status": "rendered",
+                    "prediction_status": "failed",
+                    "renders_dir": os.path.join(
+                        PUBLIC_ROOT,
+                        model_id,
+                        "renders",
+                    ),
+                },
+                status=502,
+            )
+
+        # ---------------------------------------------------------
+        # Final response
+        # ---------------------------------------------------------
+
+        return JsonResponse(
+            {
+                "id": model.id,
+                "status": "rendered",
+                "prediction_status": "completed",
+                "prediction": prediction,
+                "renders_dir": os.path.join(
+                    PUBLIC_ROOT,
+                    model_id,
+                    "renders",
+                ),
+            }
+        )
+
+    def _run_prediction(self, model_id):
+        
+        prediction_url = (
+            f"{settings.PREDICTION_API_URL.rstrip('/')}/predict"
+        )
+
+        try:
+            response = httpx.post(
+                prediction_url,
+                json={
+                    "model_id": model_id,
+                },
+                timeout=900.0,
+            )
+
+            response.raise_for_status()
+
+            return response.json()
+
+        except httpx.TimeoutException:
+            print(
+                f"Prediction service timed out for model {model_id}"
+            )
+            return None
+
+        except httpx.HTTPStatusError as exc:
+            print(
+                f"Prediction service returned "
+                f"{exc.response.status_code}: "
+                f"{exc.response.text}"
+            )
+            return None
+
+        except httpx.RequestError as exc:
+            print(
+                f"Could not connect to prediction service: {exc}"
+            )
+            return None
+
+        except ValueError:
+            print(
+                f"Prediction service returned invalid JSON "
+                f"for model {model_id}"
+            )
+            return None
 
     def _apply_geometry(self, model, geometry_path):
         import json
+
         if not os.path.isfile(geometry_path):
             return
+
         with open(geometry_path) as f:
             data = json.load(f)
 
@@ -527,6 +653,7 @@ class Model3DUploadView(View):
         model.edges = data.get("_debug_raw", {}).get("edges")
 
         dims = data.get("dimensions") or {}
+
         if dims:
             model.bounding_box = [
                 dims.get("width"),
@@ -536,4 +663,3 @@ class Model3DUploadView(View):
                 dims.get("aspect_hd"),
                 dims.get("aspect_wd"),
             ]
-            
