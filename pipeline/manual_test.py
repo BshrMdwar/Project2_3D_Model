@@ -19,4 +19,4 @@ def process_model(model_id : str):
         geometry_json=None, 
     )
 
-    return json.dumps(result, indent=2)
+    return result

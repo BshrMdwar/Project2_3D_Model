@@ -581,7 +581,10 @@ class Model3DUploadView(View):
                 },
                 status=502,
             )
-
+        
+        self._apply_prediction(model, prediction)
+        model.save()
+        
         # ---------------------------------------------------------
         # Final response
         # ---------------------------------------------------------
@@ -670,3 +673,21 @@ class Model3DUploadView(View):
                 dims.get("aspect_hd"),
                 dims.get("aspect_wd"),
             ]
+
+    def _apply_prediction(self, model, prediction):
+        preds = prediction.get("predictions", {}) if prediction else {}
+
+        super_category = preds.get("super_category") or {}
+        model.ai_label = super_category.get("label")
+        model.ai_confidence = super_category.get("confidence")
+
+        object_category = preds.get("object_category") or {}
+        model.object_category = object_category.get("label")
+
+        style_class = preds.get("style_class") or []
+        model.style = style_class[0].get("label") if style_class else None
+
+        materials_primary = preds.get("materials_primary") or {}
+        model.material = materials_primary.get("label")
+
+        model.prediction = prediction
