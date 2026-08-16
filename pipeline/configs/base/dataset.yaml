@@ -1,0 +1,8 @@
+root_dir: "dataset"
+models_subdir: "models"
+metadata_subdir: "metadata"
+geometry_subdir: "geometry"
+renders_subdir: "renders"
+expected_views_per_sample: 12
+k_folds: 5
+image_size: 224

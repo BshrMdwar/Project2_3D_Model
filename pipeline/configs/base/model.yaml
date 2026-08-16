@@ -1,0 +1,6 @@
+backbone_name: "dinov2_vits14"
+freeze_backbone_except_last_n_layers: 2
+pooling_method: "mean"
+use_geometry_fusion: false
+geometry_features: "all"
+freeze_visual_backbone_entirely: false

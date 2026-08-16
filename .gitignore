@@ -6,4 +6,4 @@ db.sqlite3
 .env
 assets/*
 *.glb
-pipeline/
+pipeline/checkpoints/*

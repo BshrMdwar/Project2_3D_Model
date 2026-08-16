@@ -1,0 +1,192 @@
+{
+  "total_discovered": 506,
+  "total_structurally_valid": 506,
+  "discovery_warnings": [],
+  "label_validation": {
+    "passed": 506,
+    "failed": 0,
+    "failures": []
+  },
+  "geometry_validation": {
+    "passed": 506,
+    "failed": 0,
+    "failures": []
+  },
+  "combo_counts": {
+    "Light / Ceiling Mounted": 43,
+    "Light / Floor Mounted": 30,
+    "Light / Free Floating": 67,
+    "Light / Wall Mounted": 14,
+    "Sofa / Large": 24,
+    "Sofa / Love Seats": 27,
+    "Sofa / Recliner Sofas": 3,
+    "Sofa / Sectional": 45,
+    "Sofa / Standard": 59,
+    "Table / Coffee Table": 112,
+    "Table / Desk Table": 21,
+    "Table / Dinner Table": 7,
+    "Table / Side Table": 54
+  },
+  "active_super_categories": [
+    "Table",
+    "Sofa",
+    "Light"
+  ],
+  "absent_super_categories": [
+    "Chair",
+    "Bed",
+    "Window",
+    "Door",
+    "Storage",
+    "Cabinet",
+    "Carpet"
+  ],
+  "low_confidence_combos": [
+    "Sofa / Recliner Sofas",
+    "Table / Dinner Table"
+  ],
+  "style_class_tag_counts": {
+    "Minimalism": 202,
+    "Post Modern": 150,
+    "Bauhaus": 85,
+    "Industrial": 45,
+    "French Classic": 17,
+    "Tropical": 7
+  },
+  "materials_primary_counts": {
+    "Fabric": 154,
+    "Metal": 150,
+    "Wood": 97,
+    "Stone": 52,
+    "Glass": 36,
+    "Plastic": 16,
+    "Concrete": 1
+  },
+  "materials_secondary_tag_counts": {
+    "Metal": 90,
+    "Glass": 51,
+    "Wood": 51,
+    "Fabric": 20,
+    "Plastic": 19,
+    "Stone": 17,
+    "Concrete": 1
+  },
+  "geometry_reference_stats": {
+    "dimensions.width": [
+      0.8758660079051385,
+      0.5267252701251488
+    ],
+    "dimensions.depth": [
+      0.6191926877470356,
+      0.37997849939939954
+    ],
+    "dimensions.height": [
+      0.578047233201581,
+      0.4105051404287549
+    ],
+    "dimensions.aspect_hw": [
+      1.0779549407114624,
+      1.4833044356568297
+    ],
+    "dimensions.aspect_hd": [
+      1.3926501976284587,
+      1.839701602997911
+    ],
+    "dimensions.aspect_wd": [
+      1.6059654150197629,
+      0.8975750025414468
+    ],
+    "mesh_density.vertices": [
+      123935.71739130435,
+      203245.7499793517
+    ],
+    "mesh_density.faces": [
+      174218.59486166007,
+      195545.9379915622
+    ],
+    "mesh_density.log_vertices": [
+      10.760472237154152,
+      1.6370016691232152
+    ],
+    "mesh_density.log_faces": [
+      11.16848581027668,
+      1.6805808530454758
+    ],
+    "mesh_density.faces_per_volume": [
+      1118109.9672417273,
+      1934821.7810732152
+    ],
+    "mesh_density.faces_per_area": [
+      71849.66205682214,
+      111023.30216760244
+    ],
+    "geometry.surface_area": [
+      3.6808652173913043,
+      4.485732484099866
+    ],
+    "geometry.volume_estimate": [
+      0.39310575889328064,
+      0.87703487901584
+    ],
+    "geometry.bounding_box_volume": [
+      0.39310575889328064,
+      0.87703487901584
+    ],
+    "geometry.occupancy_ratio": [
+      1.0,
+      0.0
+    ],
+    "shape_descriptors.compactness": [
+      14.575792,
+      24.649914456929032
+    ],
+    "shape_descriptors.elongation": [
+      3.1678675889328067,
+      1.750541472903923
+    ],
+    "structure.connected_components": [
+      8319.102766798418,
+      57324.06349161772
+    ],
+    "structure.objects_count": [
+      3.772727272727273,
+      24.433537488911888
+    ],
+    "materials_and_textures.materials_count": [
+      2.2628458498023716,
+      1.9337043348192056
+    ],
+    "materials_and_textures.textures_count": [
+      1.1146245059288538,
+      0.9692421743821512
+    ],
+    "materials_and_textures.avg_roughness": [
+      0.5627365612648221,
+      0.13503990300057367
+    ],
+    "materials_and_textures.avg_metallic": [
+      0.19432154150197625,
+      0.19793272659993308
+    ],
+    "materials_and_textures.texture_resolution.avg_width": [
+      1347.4861660079052,
+      1262.4161228374442
+    ],
+    "materials_and_textures.texture_resolution.avg_height": [
+      1348.48814229249,
+      1262.6543895963396
+    ],
+    "physics_proxy.stability_score": [
+      0.8729343873517786,
+      0.27160951823995
+    ],
+    "render_links.views_count": [
+      12.0,
+      0.0
+    ],
+    "_debug_raw.edges": [
+      290543.66403162054,
+      339318.71770274127
+    ]
+  }
+}

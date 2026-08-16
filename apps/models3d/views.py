@@ -454,7 +454,6 @@ class Model3DUploadView(View):
 
         model = Model3D.objects.create(
             id=model_id,
-            source_file=uploaded_model.name,
         )
 
         cmd = [
@@ -520,7 +519,7 @@ class Model3DUploadView(View):
 
             banner_path = os.path.join(
                 banner_dir,
-                'banner',
+                'banner.' + model_banner.name.rsplit('.', 1)[-1],
             )
 
             with open(banner_path, "wb") as dest:

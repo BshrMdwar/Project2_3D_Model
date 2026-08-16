@@ -1,0 +1,6 @@
+extends: base
+experiment_name: "exp05_attention_pooling"
+model:
+  use_geometry_fusion: true
+  geometry_features: "all"
+  pooling_method: "attention"

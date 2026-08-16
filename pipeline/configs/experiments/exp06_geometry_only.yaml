@@ -1,0 +1,6 @@
+extends: base
+experiment_name: "exp06_geometry_only"
+model:
+  use_geometry_fusion: true
+  geometry_features: "all"
+  freeze_visual_backbone_entirely: true

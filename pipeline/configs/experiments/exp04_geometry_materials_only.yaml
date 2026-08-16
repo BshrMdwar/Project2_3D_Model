@@ -1,0 +1,7 @@
+extends: base
+experiment_name: "exp04_geometry_materials_only"
+model:
+  use_geometry_fusion: true
+  geometry_features:
+    - "materials_and_textures.avg_roughness"
+    - "materials_and_textures.avg_metallic"

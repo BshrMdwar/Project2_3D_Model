@@ -1,0 +1,4 @@
+extends: base
+experiment_name: "exp01_baseline"
+model:
+  use_geometry_fusion: false

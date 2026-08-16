@@ -1,0 +1,5 @@
+extends: base
+experiment_name: "exp02_full_geometry"
+model:
+  use_geometry_fusion: true
+  geometry_features: "all"

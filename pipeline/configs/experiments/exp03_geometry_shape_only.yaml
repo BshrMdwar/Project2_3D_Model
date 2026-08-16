@@ -1,0 +1,11 @@
+extends: base
+experiment_name: "exp03_geometry_shape_only"
+model:
+  use_geometry_fusion: true
+  geometry_features:
+    - "dimensions.aspect_hw"
+    - "dimensions.aspect_hd"
+    - "dimensions.aspect_wd"
+    - "shape_descriptors.compactness"
+    - "shape_descriptors.elongation"
+    - "geometry.occupancy_ratio"

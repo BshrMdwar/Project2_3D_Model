@@ -1,0 +1,9 @@
+use_background_synthesis: true
+use_color_jitter: true
+color_jitter_strength: 0.3
+use_random_scale: true
+scale_range: [0.85, 1.15]
+use_horizontal_flip: true
+horizontal_flip_prob: 0.5
+use_rotation: true
+max_rotation_degrees: 15.0
