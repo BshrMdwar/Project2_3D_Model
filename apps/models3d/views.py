@@ -73,8 +73,35 @@ class Model3DListView(generics.ListAPIView):
         return Model3D.objects.filter(is_active=True)
 
 
+class Model3DSearchView(generics.ListAPIView):
+    """GET /api/models/search/?keyword=chair&ai_label=Chair&style=Minimal&object_category=Armchair"""
+    serializer_class = Model3DListSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        queryset = Model3D.objects.filter(is_active=True)
+
+        keyword = (self.request.query_params.get('keyword') or '').strip()
+        ai_label = (self.request.query_params.get('ai_label') or '').strip()
+        style = (self.request.query_params.get('style') or '').strip()
+        object_category = (self.request.query_params.get('object_category') or '').strip()
+
+        if keyword:
+            queryset = queryset.filter(title__icontains=keyword)
+
+        if ai_label:
+            queryset = queryset.filter(ai_label__iexact=ai_label)
+
+        if style:
+            queryset = queryset.filter(style__iexact=style)
+
+        if object_category:
+            queryset = queryset.filter(object_category__iexact=object_category)
+
+        return queryset.order_by('-uploaded_at')
+
+
 class Model3DDetailView(generics.RetrieveAPIView):
-    """GET /api/models/<id>/ — تفاصيل موديل + يزيد عداد المشاهدات"""
     serializer_class = Model3DListSerializer
     permission_classes = [permissions.AllowAny]
     lookup_field = 'id'
@@ -91,7 +118,6 @@ class Model3DDetailView(generics.RetrieveAPIView):
 
 
 class Model3DTopRatedView(generics.ListAPIView):
-    """GET /api/models/top-rated/ — الموديلات الأعلى تقييماً (downloads+usage)"""
     serializer_class = Model3DListSerializer
     permission_classes = [permissions.AllowAny]
 
@@ -307,14 +333,6 @@ class AdminReportUpdateView(generics.UpdateAPIView):
 # ════════════════════════════════════════════════════════════
 
 class Model3DRecommendView(APIView):
-    """
-    GET /api/models/<id>/recommend/
-    يقترح موديلات مشابهة بناءً على:
-      1. نفس التصنيف AI (ai_label)
-      2. تقاطع عدد الأوجه (faces) بفارق ≤ 20%
-      3. نفس الفئة (category)
-    يُرجع أقصى 10 نتائج مرتبة بـ rating.
-    """
     permission_classes = [permissions.AllowAny]
 
     def get(self, request, id):
@@ -369,17 +387,6 @@ class Model3DRendersListView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request, id):
-        # try:
-        #     model_instance = Model3D.objects.get(id=id, is_active=True)
-        # except Model3D.DoesNotExist:
-        #     return Response({'error': 'Model not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        # # 🚨 التعديل هنا: استبدال model_3d بـ model بناءً على بنية قاعدة البيانات عندك
-        # renders = RenderImage.objects.filter(model=model_instance)
-
-        # # تجميع روابط الصور بشكل مطلق ومباشر
-        # urls = [request.build_absolute_uri(img.image.url) for img in renders if img.image]
-
         return Response({
             "model_id": id,
             # "renders_count": len(urls),
@@ -720,10 +727,7 @@ class SimiliarModelsView(APIView):
             seen_ids.update(m.pk for m in style_results)
 
         results = label_results + style_results
-
-        # ── Fallback: if either bucket came up short, top up from
-        # whatever's left (prefer the other bucket's criteria first,
-        # then just generally popular active models) ──
+        
         missing = limit - len(results)
         if missing > 0:
             fallback_qs = (

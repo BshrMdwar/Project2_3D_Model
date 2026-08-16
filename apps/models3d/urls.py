@@ -6,6 +6,7 @@ from .views import (
     Model3DTopRatedView,
     Model3DUploadView,
     SimiliarModelsView,
+    Model3DSearchView,
     # Model3DDownloadView,
     Model3DDeleteView,
     Model3DStatsView,
@@ -29,6 +30,7 @@ urlpatterns = [
     path('similar-models/', SimiliarModelsView.as_view(), name='similar-models'),
     # ── Read ───────────────────────────────────────────────
     path('',   Model3DListView.as_view(),       name='model-list'),
+    path('search/', Model3DSearchView.as_view(), name='model-search'),
     path('top-rated/',     Model3DTopRatedView.as_view(),   name='model-top-rated'),
     path('stats/',         Model3DStatsView.as_view(),      name='model-stats'),
     # ── Report ─────────────────────────────────────────────
