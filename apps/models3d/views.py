@@ -2,6 +2,7 @@ from __future__ import annotations
 import os
 import uuid
 import subprocess
+import json
 import shutil
 import httpx
 from django.conf import settings
@@ -454,6 +455,8 @@ class Model3DUploadView(View):
 
         model = Model3D.objects.create(
             id=model_id,
+            title = request.POST.get("title"),
+            description = request.POST.get("description") or None
         )
 
         cmd = [
@@ -581,6 +584,8 @@ class Model3DUploadView(View):
         return JsonResponse(
             {
                 "id": model.id,
+                "title" : model.title,
+                "description" : model.description,
                 "status": "rendered",
                 "prediction_status": "completed",
                 "prediction": prediction,

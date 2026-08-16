@@ -287,132 +287,12 @@ def get_mesh_bounding_box(objects):
     return (min_coords, max_coords) if has_mesh else (None, None)
 
 
-def compute_surface_area(obj):
-    """حساب المساحة السطحية الكلية للـ mesh بالوحدات العالمية."""
-    if obj.type != 'MESH':
-        return 0.0
-    mesh = obj.data
-    scale = obj.matrix_world.to_scale()
-    total = 0.0
-    for poly in mesh.polygons:
-        verts = [obj.matrix_world @ mesh.vertices[v].co for v in poly.vertices]
-        if len(verts) >= 3:
-            for i in range(1, len(verts) - 1):
-                a = verts[i] - verts[0]
-                b = verts[i + 1] - verts[0]
-                total += a.cross(b).length * 0.5
-    return round(total, 6)
-
-
 def compute_volume_estimate(min_c, max_c):
     """تقدير الحجم من الـ bounding box (ليس الحجم الحقيقي)."""
     if min_c is None:
         return None
     dims = max_c - min_c
     return round(dims.x * dims.y * dims.z, 6)
-
-
-def count_connected_components(obj):
-    """
-    يعد عدد المكونات المنفصلة (islands) داخل الـ mesh.
-    """
-    if obj.type != 'MESH':
-        return None
-    mesh = obj.data
-    if not mesh.vertices:
-        return 0
-    n = len(mesh.vertices)
-    parent = list(range(n))
-
-    def find(x):
-        while parent[x] != x:
-            parent[x] = parent[parent[x]]
-            x = parent[x]
-        return x
-
-    def union(a, b):
-        ra, rb = find(a), find(b)
-        if ra != rb:
-            parent[ra] = rb
-
-    for edge in mesh.edges:
-        union(edge.vertices[0], edge.vertices[1])
-
-    return len(set(find(i) for i in range(n)))
-
-
-def estimate_symmetry(min_c, max_c):
-    """
-    تخمين محور التماثل الرئيسي بناءً على أبعاد الـ bounding box.
-    """
-    if min_c is None:
-        return None
-    dims = max_c - min_c
-    axes = {'X': dims.x, 'Y': dims.y, 'Z': dims.z}
-    sorted_axes = sorted(axes.items(), key=lambda kv: kv[1])
-    # المحور ذو أصغر امتداد هو الأرجح لمحور التماثل
-    return sorted_axes[0][0]
-
-
-def compute_compactness(surface_area, volume):
-    """
-    Compactness = (surface_area^3) / (36π × volume^2)
-    قيمة 1 تعني كرة مثالية — كلما كبرت القيمة كلما قل التكثيف.
-    """
-    if not surface_area or not volume or volume == 0:
-        return None
-    try:
-        val = (surface_area ** 3) / (36 * math.pi * (volume ** 2))
-        return round(val, 6)
-    except:
-        return None
-
-
-def compute_elongation(min_c, max_c):
-    """
-    Elongation = أطول بعد / أقصر بعد
-    قيمة 1 تعني شكل متكافئ، كلما كبرت كلما كان الشكل ممدوداً.
-    """
-    if min_c is None:
-        return None
-    dims = sorted([abs(max_c.x - min_c.x),
-                   abs(max_c.y - min_c.y),
-                   abs(max_c.z - min_c.z)])
-    return round(dims[2] / dims[0], 4) if dims[0] > 0 else None
-
-
-def compute_center_of_mass(objects):
-    """متوسط مراكز الـ mesh المرجحة بالمساحة السطحية."""
-    weighted_sum = Vector((0, 0, 0))
-    total_area = 0.0
-    for obj in objects:
-        if obj.type == 'MESH':
-            area = compute_surface_area(obj)
-            center = obj.matrix_world.translation
-            weighted_sum += center * area
-            total_area += area
-    if total_area == 0:
-        return None
-    com = weighted_sum / total_area
-    return [round(com.x, 4), round(com.y, 4), round(com.z, 4)]
-
-
-def stability_score(min_c, max_c, com):
-    """
-    تقدير بسيط للاستقرار:
-    نسبة المسافة الأفقية لمركز الكتلة إلى نصف قاعدة الـ bounding box.
-    قيمة <= 1 تعني مستقر.
-    """
-    if min_c is None or com is None:
-        return None
-    base_half_x = (max_c.x - min_c.x) / 2
-    base_half_y = (max_c.y - min_c.y) / 2
-    if base_half_x == 0 or base_half_y == 0:
-        return None
-    offset_x = abs(com[0] - ((max_c.x + min_c.x) / 2)) / base_half_x
-    offset_y = abs(com[1] - ((max_c.y + min_c.y) / 2)) / base_half_y
-    score = round(1.0 - max(offset_x, offset_y), 4)
-    return max(0.0, min(1.0, score))
 
 
 def lod_suggestions(vert_count):
@@ -581,107 +461,6 @@ def compute_avg_base_color(mats_data):
     ]
 
 
-def compute_materials_breakdown(mats_data, mesh_objects):
-    """
-    لكل مادة: نسبة مساهمتها في المساحة السطحية الكلية للموديل + خصائصها
-    (roughness, metallic, base_color). هذا أدق بكثير من متوسط عام واحد،
-    لأن قطعة الأثاث الواحدة غالباً مركّبة من مواد مختلفة (خشب + قماش +
-    معدن)، والمادة ذات أكبر مساهمة سطحية هي أقرب مرشح لـ materials.primary.
-    """
-    # نحسب المساحة السطحية لكل مادة عبر كل الأوبجكتس التي تستخدمها
-    area_per_material = {}
-    for obj in mesh_objects:
-        if not obj.data.materials:
-            continue
-        obj_area = compute_surface_area(obj)
-        mat_slots = [m for m in obj.data.materials if m]
-        if not mat_slots or obj_area == 0:
-            continue
-        # تقسيم مبسّط: توزيع مساحة الأوبجكت بالتساوي على خاماته المرتبطة
-        # (Blender لا يعطي مساحة لكل material slot مباشرة بدون تحليل بالـ polygon
-        # material_index، وهذا تبسيط مقصود كافٍ لتحديد "المادة السائدة").
-        share = obj_area / len(mat_slots)
-        for mat in mat_slots:
-            area_per_material[mat.name] = area_per_material.get(mat.name, 0.0) + share
-
-    total_area = sum(area_per_material.values())
-
-    breakdown = []
-    for m in mats_data:
-        name = m.get("name")
-        principled = m.get("principled") or {}
-        area = area_per_material.get(name, 0.0)
-        share = round(area / total_area, 4) if total_area > 0 else 0.0
-        breakdown.append({
-            "material_name": name,
-            "surface_area_share": share,
-            "roughness": principled.get("roughness"),
-            "metallic": principled.get("metallic"),
-            "base_color_rgb": principled.get("base_color")[:3] if principled.get("base_color") else None,
-        })
-
-    # الأكثر مساهمة أولاً، يسهّل أخذ breakdown[0] كمرشح لـ materials.primary
-    breakdown.sort(key=lambda x: x["surface_area_share"], reverse=True)
-    return breakdown
-
-
-def compute_texture_resolution(objects):
-    """
-    متوسط أبعاد (width, height) كل صور التكستشر الفريدة المستخدمة فعلياً
-    في شيدرز الموديل. مؤشر غير مباشر على جودة/مصدر الموديل (احترافي مقابل
-    هاوٍ) ومفيد كـ feature مساعد.
-    """
-    seen_images = {}
-    for obj in objects:
-        if obj.type != 'MESH':
-            continue
-        for mat in obj.data.materials:
-            if not mat or not mat.use_nodes:
-                continue
-            for node in mat.node_tree.nodes:
-                if node.type == 'TEX_IMAGE' and node.image:
-                    img = node.image
-                    if img.name not in seen_images:
-                        try:
-                            w, h = img.size[0], img.size[1]
-                        except Exception:
-                            w, h = 0, 0
-                        seen_images[img.name] = (w, h)
-
-    if not seen_images:
-        return {"avg_width": 0, "avg_height": 0}
-
-    widths = [v[0] for v in seen_images.values() if v[0] > 0]
-    heights = [v[1] for v in seen_images.values() if v[1] > 0]
-
-    return {
-        "avg_width": round(sum(widths) / len(widths)) if widths else 0,
-        "avg_height": round(sum(heights) / len(heights)) if heights else 0,
-    }
-
-
-def is_already_rendered(model_id, renders_root, geometry_root, expected_views=12):
-    """
-    يتحقق إن كان الموديل قد تمت معالجته بالكامل في تشغيل سابق، عبر التأكد من:
-    1. وجود مجلد الرندر الخاص به.
-    2. احتوائه على كل عدد الصور المتوقع (view_01.png ... view_12.png).
-    3. وجود ملف الـ JSON الخاص بجيومتريته.
-    إذا تحققت الشروط الثلاثة، نعتبره مكتملاً ونتخطاه لتوفير وقت إعادة التشغيل.
-    """
-    renders_folder = os.path.join(renders_root, model_id)
-    geometry_path = os.path.join(geometry_root, model_id + ".json")
-
-    if not os.path.isdir(renders_folder):
-        return False
-
-    if not os.path.exists(geometry_path):
-        return False
-
-    expected_files = {f"view_{i+1:02d}.png" for i in range(expected_views)}
-    existing_files = set(os.listdir(renders_folder))
-
-    return expected_files.issubset(existing_files)
-
 
 # =========================================
 # IMPORT + RENDER + DATA EXTRACTION LOOP
@@ -713,11 +492,6 @@ for file in os.listdir(MODELS_FOLDER):
     model_id = os.path.splitext(
         file
     )[0]
-
-    # ---- 0. تخطي الموديلات المكتملة من تشغيل سابق (استئناف العمل) ----
-    if is_already_rendered(model_id, RENDERS_ROOT, GEOMETRY_ROOT):
-        print(f"[SKIP] {model_id}: already fully rendered, resuming past it")
-        continue
 
     print(f"\nProcessing {model_id} ({extension.upper()})")
 
@@ -760,27 +534,12 @@ for file in os.listdir(MODELS_FOLDER):
     total_faces = sum(len(o.data.polygons) for o in mesh_objects)
     total_edges = sum(len(o.data.edges) for o in mesh_objects)
 
-    total_surface = sum(compute_surface_area(o) for o in mesh_objects)
     volume_est = compute_volume_estimate(min_c, max_c)
     # bounding_box_volume هي نفس طريقة حساب volume_est حالياً (تقدير من الصندوق
     # المحيط)، نحتفظ بها كاسم صريح منفصل لأن volume_estimate قد يصبح لاحقاً
     # حجماً حقيقياً محسوباً من الـ mesh (mesh-based volume) بدل تقدير الصندوق،
     # وحينها occupancy_ratio يعبّر فعلاً عن "نسبة امتلاء الصندوق المحيط".
     bounding_box_volume = volume_est
-
-    # Structure (topology مبسطة: فقط الأجزاء المنفصلة + عدد العناصر)
-    total_components = sum(count_connected_components(o)
-                           or 0 for o in mesh_objects)
-    objects_count = len(imported)
-
-    # Shape descriptors
-    symmetry = estimate_symmetry(min_c, max_c)
-    compactness = compute_compactness(total_surface, volume_est)
-    elongation = compute_elongation(min_c, max_c)
-
-    # Physics (center_of_mass تُستخدم داخلياً فقط لحساب الاستقرار ولا تُصدَّر)
-    com = compute_center_of_mass(mesh_objects)
-    stab = stability_score(min_c, max_c, com)
 
     # LOD
     lod_recs = lod_suggestions(total_verts)
@@ -795,16 +554,12 @@ for file in os.listdir(MODELS_FOLDER):
     has_uv = check_has_uv(mesh_objects)
     avg_roughness, avg_metallic = compute_material_summary(materials)
     avg_base_color = compute_avg_base_color(materials)
-    materials_breakdown = compute_materials_breakdown(materials, mesh_objects)
-    texture_resolution = compute_texture_resolution(imported)
 
     # Mesh density (معالجة لوغاريتمية + كثافة نسبية بحماية من القسمة على صفر)
     log_vertices = safe_log(total_verts)
     log_faces = safe_log(total_faces)
     safe_volume = volume_est if volume_est and volume_est > 0 else EPSILON
-    safe_surface = total_surface if total_surface and total_surface > 0 else EPSILON
     faces_per_volume = round(total_faces / safe_volume, 6)
-    faces_per_area = round(total_faces / safe_surface, 6)
 
     # occupancy_ratio: نسبة الحجم المقدَّر للـ mesh إلى حجم الصندوق المحيط به.
     # قيمة قريبة من 1 = شكل مصمت يملأ صندوقه (خزانة مثلاً)، قيمة قريبة من 0 =
@@ -963,42 +718,12 @@ for file in os.listdir(MODELS_FOLDER):
             "vertices":         total_verts,
             "faces":            total_faces,
             "log_vertices":     log_vertices,
-            "log_faces":        log_faces,
-            "faces_per_volume": faces_per_volume,
-            "faces_per_area":   faces_per_area
         },
 
         "geometry": {
-            "surface_area":       round(total_surface, 4),
             "volume_estimate":    volume_est if volume_est is not None else 0.0,
             "bounding_box_volume": bounding_box_volume if bounding_box_volume is not None else 0.0,
             "occupancy_ratio":    occupancy_ratio
-        },
-
-        "shape_descriptors": {
-            "compactness":   compactness if compactness is not None else 0.0,
-            "elongation":    elongation if elongation is not None else 0.0,
-            "symmetry_axis": symmetry
-        },
-
-        "structure": {
-            "connected_components": total_components,
-            "objects_count":        objects_count
-        },
-
-        "materials_and_textures": {
-            "materials_count":     materials_count,
-            "textures_count":      textures_count,
-            "has_uv":              has_uv,
-            "avg_roughness":       avg_roughness,
-            "avg_metallic":        avg_metallic,
-            "avg_base_color_rgb":  avg_base_color,
-            "materials_breakdown": materials_breakdown,
-            "texture_resolution":  texture_resolution
-        },
-
-        "physics_proxy": {
-            "stability_score": stab if stab is not None else 0.0
         },
 
         "render_links": {

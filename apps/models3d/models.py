@@ -40,6 +40,8 @@ class Model3D(models.Model):
 
     # ── Identity ─────────────────────────────────────────
     id          = models.CharField(max_length=100, primary_key=True, db_index=True)
+    title = models.CharField(max_length=100)
+    description = models.CharField(blank=True,null=True)
 
     uploaded_at = models.DateTimeField(auto_now_add=True)
     updated_at  = models.DateTimeField(auto_now=True)
@@ -57,6 +59,10 @@ class Model3D(models.Model):
     # ── AI Classification ─────────────────────────────────
     ai_label      = models.CharField(max_length=100, null=True, blank=True)
     ai_confidence = models.FloatField(null=True, blank=True)
+    material=models.CharField(blank=True, null=True)
+    object_category = models.CharField(blank=True, null=True)
+    style = models.CharField(blank=True, null=True)
+    prediction = models.JSONField(blank=True, null=True)
 
     # ── Taxonomy ─────────────────────────────────────────
     category = models.ForeignKey(
