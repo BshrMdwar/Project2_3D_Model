@@ -27,7 +27,7 @@ class Model3DListSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Model3D
         fields = (
-            'id', 'uploaded_at', 'is_active',
+            'id', 'title', 'description', 'banner_url', 'model_url','uploaded_at', 'is_active',
             'ai_label', 'ai_confidence',
             'category', 'tags',
             'vertices', 'faces',

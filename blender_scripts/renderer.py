@@ -48,9 +48,8 @@ TEMP_FOLDER = os.path.join("/assets", "temp")
 MODEL_ROOT = os.path.join(PUBLIC_ROOT, args.uid)
 RENDERS_ROOT = os.path.join(MODEL_ROOT, "renders")
 GEOMETRY_ROOT = os.path.join(MODEL_ROOT, "geometry")
-MODEL_STORE_ROOT = os.path.join(MODEL_ROOT, "model")
 
-for folder in (PUBLIC_ROOT, TEMP_FOLDER, MODEL_ROOT, RENDERS_ROOT, GEOMETRY_ROOT, MODEL_STORE_ROOT):
+for folder in (PUBLIC_ROOT, TEMP_FOLDER, MODEL_ROOT, RENDERS_ROOT, GEOMETRY_ROOT):
     os.makedirs(folder, exist_ok=True)
 
 if os.path.isabs(args.model) or os.sep in args.model or "/" in args.model:
@@ -76,7 +75,7 @@ MODEL_IN_TEMP = os.path.dirname(os.path.abspath(MODEL_PATH)) == os.path.abspath(
 # Where the model is persisted once rendering succeeds — lives alongside
 # renders/ and geometry/ under PUBLIC_ROOT/<uid>/model/, so it survives even
 # if the temp copy is cleaned up (or was never in temp/ to begin with).
-STORED_MODEL_PATH = os.path.join(MODEL_STORE_ROOT, os.path.basename(MODEL_PATH))
+STORED_MODEL_PATH = os.path.join(MODEL_ROOT, "model" + extension)
 
 # =========================================
 # GPU ACTIVATION

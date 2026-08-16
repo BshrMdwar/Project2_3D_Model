@@ -5,6 +5,7 @@ import subprocess
 import json
 import shutil
 import httpx
+import re
 from django.conf import settings
 from django.core.files import File
 from django.http import JsonResponse
@@ -528,6 +529,7 @@ class Model3DUploadView(View):
             with open(banner_path, "wb") as dest:
                 for chunk in model_banner.chunks():
                     dest.write(chunk)
+            model.banner_url = "banner" + os.path.splitext(model_banner.name)[1].lower()
 
         else:
             renders_dir = os.path.join(
@@ -553,7 +555,10 @@ class Model3DUploadView(View):
                     preferred_path,
                     banner_path,
                 )
+            model.banner_url = "banner.png"
 
+
+        model.model_url = "model" + ext
         model.save()
 
         # ---------------------------------------------------------
@@ -583,9 +588,7 @@ class Model3DUploadView(View):
 
         return JsonResponse(
             {
-                "id": model.id,
-                "title" : model.title,
-                "description" : model.description,
+                "model" : Model3DListSerializer(model).data,
                 "status": "rendered",
                 "prediction_status": "completed",
                 "prediction": prediction,

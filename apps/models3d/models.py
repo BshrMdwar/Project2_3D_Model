@@ -47,6 +47,9 @@ class Model3D(models.Model):
     updated_at  = models.DateTimeField(auto_now=True)
 
     # رابط بالمستخدم الذي رفع الموديل (اختياري للتوافق مع البيانات القديمة)
+    model_url = models.CharField(blank=True, null=True)
+    banner_url = models.CharField(blank=True, null=True)
+
     uploaded_by = models.ForeignKey(
         User, null=True, blank=True,
         on_delete=models.SET_NULL,
