@@ -84,8 +84,7 @@ class Model3DListView(generics.ListAPIView):
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['id', 'ai_label']
     ordering_fields = [
-        'uploaded_at', 'vertices', 'faces',
-        'stability_score', 'downloads_count', 'usage_count',
+        'uploaded_at', 'vertices', 'faces', 'downloads_count',
     ]
     ordering = ['-uploaded_at']
 
@@ -148,7 +147,7 @@ class Model3DTopRatedView(generics.ListAPIView):
             .filter(is_active=True)
             .annotate(
                 rating=ExpressionWrapper(
-                    F('downloads_count') + F('usage_count'),
+                    F('downloads_count'),
                     output_field=IntegerField()
                 )
             )
@@ -231,7 +230,7 @@ class AdminDashboardStatsView(APIView):
         top_downloads = (
             qs.filter(is_active=True)
             .order_by('-downloads_count')[:5]
-            .values('id', 'ai_label', 'downloads_count', 'usage_count')
+            .values('id', 'ai_label', 'downloads_count')
         )
 
         # توزيع التصنيفات AI
@@ -278,7 +277,7 @@ class AdminModel3DListView(generics.ListAPIView):
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = Model3DFilter
     search_fields = ['id', 'ai_label']
-    ordering_fields = ['uploaded_at', 'downloads_count', 'usage_count']
+    ordering_fields = ['uploaded_at', 'downloads_count']
     ordering = ['-uploaded_at']
 
 
@@ -475,7 +474,7 @@ class Model3DRecommendView(APIView):
             .filter(filters & similarity_q)
             .annotate(
                 rating=ExpressionWrapper(
-                    Coalesce(F('downloads_count'), 0) + Coalesce(F('usage_count'), 0),
+                    Coalesce(F('downloads_count'), 0),
                     output_field=IntegerField()
                 )
             )
@@ -803,7 +802,7 @@ class SimiliarModelsView(APIView):
                         default=Value(0),
                         output_field=IntegerField(),
                     ),
-                    rating_score_annot=F('downloads_count') + F('usage_count'),
+                    rating_score_annot=F('downloads_count'),
                 )
                 .order_by('-category_match', '-rating_score_annot', '-uploaded_at')
             )
@@ -817,7 +816,7 @@ class SimiliarModelsView(APIView):
                 base_qs
                 .exclude(pk__in=seen_ids)
                 .filter(style=reference.style)
-                .annotate(rating_score_annot=F('downloads_count') + F('usage_count'))
+                .annotate(rating_score_annot=F('downloads_count'))
                 .order_by('-rating_score_annot', '-uploaded_at')
             )
             style_results = list(style_qs[:style_quota])
@@ -830,7 +829,7 @@ class SimiliarModelsView(APIView):
             fallback_qs = (
                 base_qs
                 .exclude(pk__in=seen_ids)
-                .annotate(rating_score_annot=F('downloads_count') + F('usage_count'))
+                .annotate(rating_score_annot=F('downloads_count'))
                 .order_by('-rating_score_annot', '-uploaded_at')
             )
             fallback_results = list(fallback_qs[:missing])
@@ -839,3 +838,16 @@ class SimiliarModelsView(APIView):
 
         serializer = Model3DListSerializer(results, many=True)
         return Response(serializer.data)
+
+class Model3DDownloadView(APIView):
+    permission_classes = [permissions.AllowAny]
+    def post(self, request, id, *args, **kwargs):
+        try:
+            model = Model3D.objects.get(id=id, is_active=True)
+        except Model3D.DoesNotExist:
+            return Response({'error': 'Model not found'}, status=status.HTTP_404_NOT_FOUND)
+        model.increment_downloads()
+        return Response({
+            'status': 'download_registered',
+            'model_id': id
+        })

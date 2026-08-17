@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import (
     # ── Public / User ──────────────────────────────────────
+    Model3DDownloadView,
     Model3DListView,
     Model3DDetailView,
     Model3DTopRatedView,
@@ -41,7 +42,8 @@ urlpatterns = [
     path('<str:id>/delete/',       Model3DDeleteView.as_view(),   name='model-delete'),
     path('<str:id>/recommend/',    Model3DRecommendView.as_view(), name='model-recommend'),
     path('<str:id>/renders/', Model3DRendersListView.as_view(), name='model-renders-list'),
-
+    path('<str:id>/download/',     Model3DDownloadView.as_view(), name='model-download'),
+    
     # ── Admin Namespace (/api/admin/…) ─────────────────────
     path('admin/models/',                  AdminModel3DListView.as_view(),     name='admin-model-list'),
     path('admin/models/<str:id>/update/',  AdminModel3DUpdateView.as_view(),   name='admin-model-update'),

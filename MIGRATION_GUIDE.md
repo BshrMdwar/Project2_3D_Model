@@ -13,22 +13,6 @@ python manage.py migrate
 python manage.py createsuperuser
 ```
 
----
-
-## الحقول الجديدة المضافة في models3d
-
-| النموذج | الحقول الجديدة |
-|---------|----------------|
-| **Tag** | جدول جديد كامل |
-| **Category** | جدول جديد كامل |
-| **RenderImage** | جدول جديد كامل |
-| **Report** | جدول جديد كامل |
-| **Model3D** | `model_file`, `uploaded_by`, `is_active`, `ai_label`, `ai_confidence`, `category`, `tags`, `downloads_count`, `usage_count` |
-
----
-
-## الـ Endpoints الجديدة
-
 | الرابط | الوصف |
 |--------|-------|
 | `GET /api/models/top-rated/` | الموديلات الأعلى تقييماً |

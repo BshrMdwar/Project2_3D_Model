@@ -14,7 +14,7 @@ class Model3DListSerializer(serializers.ModelSerializer):
             'uploaded_by',
             'ai_label', 'ai_confidence',
             'vertices', 'faces', 'object_category',
-            'views_count', 'downloads_count', 'usage_count', 'rating_score', 'prediction'
+            'views_count', 'downloads_count', 'rating_score', 'prediction'
         )
 
 
@@ -49,5 +49,5 @@ class Model3DRecommendSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'ai_label',
             'vertices', 'faces',
-            'downloads_count', 'usage_count', 'rating_score',
+            'downloads_count', 'rating_score',
         )

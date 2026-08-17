@@ -16,7 +16,7 @@ class ReportAdmin(admin.ModelAdmin):
 class Model3DAdmin(admin.ModelAdmin):
     list_display = (
         'id', 'ai_label', 'is_active',
-        'downloads_count', 'usage_count', 'views_count', 'uploaded_at',
+        'downloads_count', 'views_count', 'uploaded_at',
     )
     list_filter  = ('is_active', 'ai_label')
     search_fields = ('id', 'ai_label')

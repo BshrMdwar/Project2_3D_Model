@@ -46,13 +46,11 @@ class Model3D(models.Model):
     # ── Platform Counters ─────────────────────────────────
     views_count     = models.PositiveIntegerField(default=0)
     downloads_count = models.PositiveIntegerField(default=0)
-    usage_count     = models.PositiveIntegerField(default=0)
 
     # التقييم محسوب برمجياً = downloads + usage
     @property
     def rating_score(self):
-        return self.downloads_count + self.usage_count
-
+        return self.downloads_count
     class Meta:
         ordering            = ['-uploaded_at']
         verbose_name        = '3D Model'
@@ -65,7 +63,6 @@ class Model3D(models.Model):
     def increment_downloads(self):
         Model3D.objects.filter(pk=self.pk).update(
             downloads_count=F('downloads_count') + 1,
-            usage_count=F('usage_count') + 1,
         )
 
     def increment_views(self):
