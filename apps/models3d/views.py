@@ -22,6 +22,7 @@ from django.db.models.functions import Coalesce
 import requests
 from django.db.models import Count, Avg, Q, Sum
 from django.db.models.functions import TruncMonth
+from django.db import transaction
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -46,6 +47,25 @@ PUBLIC_ROOT = "./assets/public"
 BLENDER_EXECUTABLE = ["docker", "compose", "exec", "blender", "blender"]
 RENDER_SCRIPT = "/scripts/renderer.py"
 ALLOWED_EXTENSIONS = {".glb", ".gltf"}
+
+
+def _apply_prediction_to_model(model, prediction):
+    preds = prediction.get("predictions", {}) if prediction else {}
+
+    super_category = preds.get("super_category") or {}
+    model.ai_label = super_category.get("label")
+    model.ai_confidence = super_category.get("confidence")
+
+    object_category = preds.get("object_category") or {}
+    model.object_category = object_category.get("label")
+
+    style_class = preds.get("style_class") or []
+    model.style = style_class[0].get("label") if style_class else None
+
+    materials_primary = preds.get("materials_primary") or {}
+    model.material = materials_primary.get("label")
+
+    model.prediction = prediction
 
 
 class IsAdminUser(permissions.BasePermission):
@@ -317,15 +337,106 @@ class AdminReportListView(generics.ListAPIView):
 
 
 class AdminReportUpdateView(generics.UpdateAPIView):
-    """PATCH /api/admin/reports/<pk>/resolve/ — تحديث حالة البلاغ"""
+    """PATCH /api/admin/reports/<pk>/resolve/ — dismiss, update_model, or delete_model"""
     queryset = Report.objects.all()
     serializer_class = ReportDetailSerializer
     permission_classes = [IsAdminUser]
     http_method_names = ['patch']
 
     def partial_update(self, request, *args, **kwargs):
-        kwargs['partial'] = True
-        return self.update(request, *args, **kwargs)
+        report = self.get_object()
+        action = (request.data.get('action') or '').strip()
+
+        if action not in {'dismiss', 'update_model', 'delete_model'}:
+            return Response(
+                {
+                    'detail': (
+                        "action is required and must be one of "
+                        "dismiss, update_model, or delete_model."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        admin_note = request.data.get('admin_note')
+        if admin_note is not None:
+            report.admin_note = admin_note
+
+        if action == 'dismiss':
+            report.status = Report.Status.DISMISSED
+            update_fields = ['status']
+            if admin_note is not None:
+                update_fields.append('admin_note')
+            report.save(update_fields=update_fields)
+
+            return Response(
+                ReportDetailSerializer(report).data,
+                status=status.HTTP_200_OK,
+            )
+
+        if action == 'delete_model':
+            model_id = report.model_id
+            report_id = report.id
+            report.model.delete()
+
+            return Response(
+                {
+                    'id': report_id,
+                    'model_id': model_id,
+                    'action': action,
+                    'status': 'deleted',
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        prediction_payload = report.model.prediction or {}
+
+        if not isinstance(prediction_payload, dict):
+            return Response(
+                {'detail': 'prediction must be an object.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        prediction_updates = request.data.get('prediction_updates')
+        if isinstance(prediction_updates, str):
+            prediction_updates = prediction_updates.strip()
+            if prediction_updates:
+                try:
+                    prediction_updates = json.loads(prediction_updates)
+                except ValueError:
+                    return Response(
+                        {'detail': 'prediction_updates must be valid JSON.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            else:
+                prediction_updates = None
+
+        if prediction_updates is not None and not isinstance(prediction_updates, dict):
+            return Response(
+                {'detail': 'prediction_updates must be an object.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if prediction_updates:
+            merged_predictions = dict(prediction_payload.get('predictions') or {})
+            merged_predictions.update(prediction_updates)
+            prediction_payload['predictions'] = merged_predictions
+
+        with transaction.atomic():
+            model = report.model
+            _apply_prediction_to_model(model, prediction_payload)
+            model.save()
+
+            report.status = Report.Status.RESOLVED
+            update_fields = ['status']
+            if admin_note is not None:
+                update_fields.append('admin_note')
+            report.save(update_fields=update_fields)
+
+        return Response(
+            ReportDetailSerializer(report).data,
+            status=status.HTTP_200_OK,
+        )
 
 
 # ════════════════════════════════════════════════════════════
@@ -394,8 +505,8 @@ class Model3DRendersListView(APIView):
         }, status=status.HTTP_200_OK)
 
 @method_decorator(csrf_exempt, name="dispatch")
-class Model3DUploadView(View):
-
+class Model3DUploadView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
     def post(self, request):
         uploaded_model = request.FILES.get("model")
 
@@ -432,7 +543,8 @@ class Model3DUploadView(View):
         model = Model3D.objects.create(
             id=model_id,
             title = request.POST.get("title"),
-            description = request.POST.get("description") or None
+            description = request.POST.get("description") or None,
+            uploaded_by = request.user,
         )
 
         cmd = [
@@ -650,22 +762,7 @@ class Model3DUploadView(View):
             ]
 
     def _apply_prediction(self, model, prediction):
-        preds = prediction.get("predictions", {}) if prediction else {}
-
-        super_category = preds.get("super_category") or {}
-        model.ai_label = super_category.get("label")
-        model.ai_confidence = super_category.get("confidence")
-
-        object_category = preds.get("object_category") or {}
-        model.object_category = object_category.get("label")
-
-        style_class = preds.get("style_class") or []
-        model.style = style_class[0].get("label") if style_class else None
-
-        materials_primary = preds.get("materials_primary") or {}
-        model.material = materials_primary.get("label")
-
-        model.prediction = prediction
+        _apply_prediction_to_model(model, prediction)
 
 
 

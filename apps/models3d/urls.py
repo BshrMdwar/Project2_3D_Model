@@ -46,6 +46,8 @@ urlpatterns = [
     path('admin/models/',                  AdminModel3DListView.as_view(),     name='admin-model-list'),
     path('admin/models/<str:id>/update/',  AdminModel3DUpdateView.as_view(),   name='admin-model-update'),
     path('admin/models/<str:id>/hide/',    AdminModel3DSoftDeleteView.as_view(), name='admin-model-hide'),
+
+
     path('admin/reports/',                 AdminReportListView.as_view(),       name='admin-report-list'),
     path('admin/reports/<int:pk>/',        AdminReportUpdateView.as_view(),     name='admin-report-update'),
     path('admin/dashboard-stats/',         AdminDashboardStatsView.as_view(),   name='admin-dashboard-stats'),

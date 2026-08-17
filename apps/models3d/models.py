@@ -81,7 +81,7 @@ class Report(models.Model):
     class Status(models.TextChoices):
         PENDING  = 'pending',  'قيد المراجعة'
         RESOLVED = 'resolved', 'تم الحل'
-        REJECTED = 'rejected', 'مرفوض'
+        DISMISSED = 'dismissed', 'مرفوض'
 
     model      = models.ForeignKey(Model3D, on_delete=models.CASCADE, related_name='reports')
     reporter   = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='submitted_reports')
