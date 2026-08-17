@@ -46,11 +46,19 @@ class Model3D(models.Model):
     # ── Platform Counters ─────────────────────────────────
     views_count     = models.PositiveIntegerField(default=0)
     downloads_count = models.PositiveIntegerField(default=0)
+    rating = models.FloatField(default=0)
+    rating_count = models.PositiveIntegerField(default=0)
 
-    # التقييم محسوب برمجياً = downloads + usage
+    # التقييم المحفوظ: متوسط تقييمات المستخدمين من 5
     @property
     def rating_score(self):
-        return self.downloads_count
+        return self.rating
+
+    def apply_rating(self, user_rating):
+        total_rating = (self.rating * self.rating_count) + user_rating
+        self.rating_count += 1
+        self.rating = total_rating / self.rating_count
+
     class Meta:
         ordering            = ['-uploaded_at']
         verbose_name        = '3D Model'
@@ -68,11 +76,6 @@ class Model3D(models.Model):
     def increment_views(self):
         Model3D.objects.filter(pk=self.pk).update(views_count=F('views_count') + 1)
 
-
-
-# ════════════════════════════════════════════════════════════
-#  Report — نظام الإبلاغ عن النماذج المخالفة
-# ════════════════════════════════════════════════════════════
 
 class Report(models.Model):
     class Status(models.TextChoices):
@@ -93,3 +96,24 @@ class Report(models.Model):
 
     def __str__(self):
         return f"Report({self.model_id} by {self.reporter_id} — {self.status})"
+
+
+class UserCollection(models.Model):
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='user_collection',
+    )
+    saved_models = models.ManyToManyField(
+        'models3d.Model3D',
+        related_name='saved_in_collections',
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f'UserCollection({self.user_id})'

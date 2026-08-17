@@ -33,12 +33,14 @@ from itertools import chain
 
 from django.shortcuts import get_object_or_404
 
-from .models import Model3D, Report
+from .models import Model3D, Report, UserCollection
 from .serializers import (
     Model3DListSerializer,
     Model3DRecommendSerializer,
+    Model3DRateSerializer,
     ReportCreateSerializer,
     ReportDetailSerializer,
+    UserCollectionSerializer,
 )
 from .filters import Model3DFilter
 
@@ -141,16 +143,9 @@ class Model3DTopRatedView(generics.ListAPIView):
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
-        from django.db.models import ExpressionWrapper, IntegerField, F
         return (
             Model3D.objects
             .filter(is_active=True)
-            .annotate(
-                rating=ExpressionWrapper(
-                    F('downloads_count'),
-                    output_field=IntegerField()
-                )
-            )
             .order_by('-rating')[:20]
         )
 
@@ -472,12 +467,6 @@ class Model3DRecommendView(APIView):
         recommendations = (
             Model3D.objects
             .filter(filters & similarity_q)
-            .annotate(
-                rating=ExpressionWrapper(
-                    Coalesce(F('downloads_count'), 0),
-                    output_field=IntegerField()
-                )
-            )
             .order_by('-rating')[:10]
         )
 
@@ -851,3 +840,59 @@ class Model3DDownloadView(APIView):
             'status': 'download_registered',
             'model_id': id
         })
+
+
+class Model3DRateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, id, *args, **kwargs):
+        model = get_object_or_404(Model3D, id=id, is_active=True)
+        serializer = Model3DRateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user_rating = serializer.validated_data['rating']
+
+        with transaction.atomic():
+            model = Model3D.objects.select_for_update().get(pk=model.pk)
+            model.apply_rating(user_rating)
+            model.save(update_fields=['rating', 'rating_count', 'updated_at'])
+
+        return Response(
+            {
+                'model_id': model.id,
+                'rating': model.rating,
+                'rating_count': model.rating_count,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+class UserCollectionView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_collection(self, user):
+        collection, _ = UserCollection.objects.get_or_create(user=user)
+        return collection
+
+    def get(self, request):
+        collection = self.get_collection(request.user)
+        return Response(UserCollectionSerializer(collection).data)
+
+
+class SaveModelView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        model = Model3D.objects.get(id=request.data.get('model_id'), is_active=True)
+
+        with transaction.atomic():
+            collection, _ = UserCollection.objects.get_or_create(user=request.user)
+            collection.saved_models.add(model)
+
+        collection.refresh_from_db()
+        return Response(
+            {
+                'detail': 'Model saved to your collection.',
+                'collection': UserCollectionSerializer(collection).data,
+            },
+            status=status.HTTP_200_OK,
+        )

@@ -6,6 +6,7 @@ from .views import (
     Model3DDetailView,
     Model3DTopRatedView,
     Model3DUploadView,
+    SaveModelView,
     SimiliarModelsView,
     Model3DSearchView,
     # Model3DDownloadView,
@@ -14,6 +15,7 @@ from .views import (
     Model3DRecommendView,
     ReportCreateView,
     Model3DRendersListView,
+    Model3DRateView,
 
     # ── Admin ──────────────────────────────────────────────
     AdminModel3DListView,
@@ -22,10 +24,14 @@ from .views import (
     AdminReportListView,
     AdminReportUpdateView,
     AdminDashboardStatsView,
+    UserCollectionView,
 )
 
 urlpatterns = [
 
+    path('collection/', UserCollectionView.as_view(), name='auth-collection'),
+    path('collection/save-model/', SaveModelView.as_view(), name='auth-save-model'),
+    
     # ── Upload & Import ────────────────────────────────────
     path('upload-user/',   Model3DUploadView.as_view(), name='model-upload-user'),
     path('similar-models/', SimiliarModelsView.as_view(), name='similar-models'),
@@ -42,6 +48,7 @@ urlpatterns = [
     path('<str:id>/delete/',       Model3DDeleteView.as_view(),   name='model-delete'),
     path('<str:id>/recommend/',    Model3DRecommendView.as_view(), name='model-recommend'),
     path('<str:id>/renders/', Model3DRendersListView.as_view(), name='model-renders-list'),
+    path('<str:id>/rate/',         Model3DRateView.as_view(),      name='model-rate'),
     path('<str:id>/download/',     Model3DDownloadView.as_view(), name='model-download'),
     
     # ── Admin Namespace (/api/admin/…) ─────────────────────

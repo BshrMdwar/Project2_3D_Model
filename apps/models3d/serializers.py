@@ -1,12 +1,12 @@
 from rest_framework import serializers
 
 from apps.users.serializers import UserSerializer
-from .models import Model3D, Report
+from .models import Model3D, Report, UserCollection
 
 
 class Model3DListSerializer(serializers.ModelSerializer):
     uploaded_by = UserSerializer(read_only=True)
-    rating_score = serializers.IntegerField(read_only=True)
+    rating = serializers.FloatField(read_only=True)
     class Meta:
         model  = Model3D
         fields = (
@@ -14,7 +14,7 @@ class Model3DListSerializer(serializers.ModelSerializer):
             'uploaded_by',
             'ai_label', 'ai_confidence',
             'vertices', 'faces', 'object_category',
-            'views_count', 'downloads_count', 'rating_score', 'prediction'
+            'views_count', 'downloads_count', 'rating', 'prediction'
         )
 
 
@@ -42,12 +42,42 @@ class ReportDetailSerializer(serializers.ModelSerializer):
 
 class Model3DRecommendSerializer(serializers.ModelSerializer):
     """تسلسل خفيف لنتائج الاقتراحات"""
-    rating_score = serializers.IntegerField(read_only=True)
+    rating = serializers.FloatField(read_only=True)
 
     class Meta:
         model  = Model3D
         fields = (
             'id', 'ai_label',
             'vertices', 'faces',
-            'downloads_count', 'rating_score',
+            'downloads_count', 'rating',
         )
+
+
+class Model3DRateSerializer(serializers.Serializer):
+    rating = serializers.IntegerField(min_value=1, max_value=5)
+
+
+
+
+class UserCollectionSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    saved_models = Model3DListSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = UserCollection
+        fields = (
+            'id',
+            'user',
+            'saved_models',
+            'created_at',
+            'updated_at',
+        )
+
+
+class SaveModelSerializer(serializers.Serializer):
+    model_id = serializers.CharField()
+
+    def validate_model_id(self, value):
+        if not Model3D.objects.filter(pk=value, is_active=True).exists():
+            raise serializers.ValidationError('Model not found.')
+        return value
